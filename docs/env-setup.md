@@ -4,7 +4,7 @@ Stack provisioned 2026-10-19 by the coding agent (see plan Task 1).
 
 | Component | Version | Path |
 |---|---|---|
-| Python | 3.12.8 (user-scope) | `C:\Users\user\AppData\Local\Programs\Python\Python312\python.exe` |
+| Python | 3.12.8 (user-scope) | `C:\Users\user\AppData\Local\Programs\Python\Python312\python.exe` (shells opened before the install may not have it on PATH — scripts resolve it explicitly) |
 | pip | 24.3.1 | same Python tree |
 | CMake | 3.30.5 | `C:\Qt\Tools\CMake_64\bin\cmake.exe` |
 | Ninja | (bundled) | `C:\Qt\Tools\Ninja\ninja.exe` |
