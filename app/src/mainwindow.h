@@ -23,6 +23,7 @@ private slots:
     void onProvinceChanged(int index);
 
 private:
+    void refreshChart();
     QComboBox* provinceCombo = nullptr;
     QComboBox* cityCombo = nullptr;
     QComboBox* technologyCombo = nullptr;

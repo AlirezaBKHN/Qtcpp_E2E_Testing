@@ -2,14 +2,15 @@
 
 #include <QtCharts/QBarCategoryAxis>
 #include <QtCharts/QBarSeries>
+#include <QtCharts/QBarSet>
 #include <QtCharts/QChart>
 #include <QtCharts/QChartView>
 #include <QtCharts/QValueAxis>
 
+#include <QDateTime>
+#include <QDir>
 #include <QHBoxLayout>
 #include <QHeaderView>
-#include <QMenuBar>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QSplitter>
 #include <QVBoxLayout>
@@ -19,19 +20,6 @@
 namespace {
 
 constexpr char kTitle[] = "Iran Signal Tracker";
-
-const char* kProvinces[] = {"Tehran",      "Isfahan", "Fars",    "Mazandaran",
-                            "Khorasan Razavi", "East Azerbaijan", "West Azerbaijan",
-                            "Khuzestan",  "Gilan",   "Kerman"};
-
-const char* kCities[] = {"Tehran", "Karaj", "Qom",   "Isfahan", "Kashan",
-                         "Shiraz", "Sari",  "Amol",  "Mashhad", "Neyshabur",
-                         "Tabriz", "Urmia", "Ahvaz", "Abadan",  "Rasht",
-                         "Kerman", "Bam"};
-
-const char* kTechnologies[] = {"2G", "3G", "4G", "5G"};
-
-const char* kOperators[] = {"MCI", "Irancell", "Rightel", "Shatel Mobile"};
 
 // Sets the stable identifier on BOTH objectName and accessibleName.
 QWidget* makeStable(QWidget* widget, const char* id)
@@ -48,20 +36,19 @@ QComboBox* makeCombo(QWidget* parent, const char* id, const QStringList& values,
     makeStable(combo, id);
     if (withAll)
         combo->addItem(QStringLiteral("All"));
-    for (const auto& value : values)
-        combo->addItem(value);
+    combo->addItems(values);
     return combo;
 }
 
-void fillCombo(QComboBox* combo, const QStringList& values)
+// Clears and reloads the combo while preserving the "All" behaviour of
+// cascade transitions: after repopulating the selection always lands on All.
+void repopulateCombo(QComboBox* combo, const QStringList& values)
 {
     combo->blockSignals(true);
-    const QString current = combo->currentText();
     combo->clear();
     combo->addItem(QStringLiteral("All"));
     combo->addItems(values);
-    const int index = combo->findText(current);
-    combo->setCurrentIndex(index < 0 ? 0 : index);
+    combo->setCurrentIndex(0);
     combo->blockSignals(false);
 }
 
@@ -73,39 +60,21 @@ MainWindow::MainWindow(QWidget* parent)
     setWindowTitle(QString::fromLatin1(kTitle));
     resize(1100, 700);
 
-    const QStringList provinceList = [&] {
-        QStringList list;
-        for (const char* p : kProvinces)
-            list << QString::fromLatin1(p);
-        return list;
-    }();
-    const QStringList cityList = [&] {
-        QStringList list;
-        for (const char* c : kCities)
-            list << QString::fromLatin1(c);
-        return list;
-    }();
-    const QStringList technologyList = [&] {
-        QStringList list;
-        for (const char* t : kTechnologies)
-            list << QString::fromLatin1(t);
-        return list;
-    }();
-    const QStringList operatorList = [&] {
-        QStringList list;
-        for (const char* o : kOperators)
-            list << QString::fromLatin1(o);
-        return list;
-    }();
+    // Populate domain data from the single source of truth.
+    const QString dbPath = QDir(QCoreApplication::applicationDirPath())
+                               .absoluteFilePath(QStringLiteral("../../database/signaltracker.db"));
+    Db::init(dbPath);
 
     // -- Filter section -----------------------------------------------------
-    provinceCombo = makeCombo(this, "provinceCombo", provinceList);
-    cityCombo = makeCombo(this, "cityCombo", cityList);
-    technologyCombo = makeCombo(this, "technologyCombo", technologyList);
-    operatorCombo = makeCombo(this, "operatorCombo", operatorList);
+    provinceCombo = makeCombo(this, "provinceCombo", Db::provinces());
+    cityCombo = makeCombo(this, "cityCombo", Db::citiesFor(QString()));
+    technologyCombo = makeCombo(this, "technologyCombo", {"2G", "3G", "4G", "5G"});
+    operatorCombo = makeCombo(this, "operatorCombo",
+                              {"MCI", "Irancell", "Rightel", "Shatel Mobile"});
 
     auto* searchButtonPtr = new QPushButton(tr("Search"), this);
     searchButton = qobject_cast<QPushButton*>(makeStable(searchButtonPtr, "searchButton"));
+    searchButton->setDefault(true);
     auto* refreshButtonPtr = new QPushButton(tr("Refresh"), this);
     refreshButton = qobject_cast<QPushButton*>(makeStable(refreshButtonPtr, "refreshButton"));
     auto* resetButtonPtr = new QPushButton(tr("Reset"), this);
@@ -136,8 +105,8 @@ MainWindow::MainWindow(QWidget* parent)
     signalTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
 
     // -- Chart --------------------------------------------------------------
-    chartGroupBy = makeCombo(this, "chartGroupBy",
-                             {tr("Operator"), tr("Technology")}, false);
+    chartGroupBy = makeCombo(this, "chartGroupBy", {tr("Operator"), tr("Technology")},
+                             false);
     chartGroupBy->setCurrentIndex(0);
 
     auto* chart = new QChart;
@@ -176,14 +145,22 @@ MainWindow::MainWindow(QWidget* parent)
     connect(provinceCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &MainWindow::onProvinceChanged);
     connect(chartGroupBy, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &MainWindow::onRefresh);
+            this, [this] { refreshChart(); });
+
+    // Initial view shows the full dataset.
+    onSearch();
 }
 
 void MainWindow::onSearch()
 {
-    const auto rows = Db::queryFilters(provinceCombo->currentText(), cityCombo->currentText(),
-                                       technologyCombo->currentText(),
-                                       operatorCombo->currentText());
+    auto current = [](QComboBox* combo) {
+        return combo->currentIndex() == 0 && combo->findText(QStringLiteral("All")) == 0
+                   ? QString()
+                   : combo->currentText();
+    };
+    // chartGroupBy has no "All" entry, so it always reports its text.
+    const auto rows = Db::queryFilters(current(provinceCombo), current(cityCombo),
+                                       current(technologyCombo), current(operatorCombo));
     signalTable->setRowCount(0);
     for (const auto& row : rows) {
         const int r = signalTable->rowCount();
@@ -191,6 +168,7 @@ void MainWindow::onSearch()
         for (int c = 0; c < row.size() && c < signalTable->columnCount(); ++c)
             signalTable->setItem(r, c, new QTableWidgetItem(row.at(c).toString()));
     }
+    refreshChart();
 }
 
 void MainWindow::onRefresh()
@@ -200,6 +178,7 @@ void MainWindow::onRefresh()
 
 void MainWindow::onReset()
 {
+    repopulateCombo(cityCombo, Db::citiesFor(QString()));
     provinceCombo->setCurrentIndex(0);
     cityCombo->setCurrentIndex(0);
     technologyCombo->setCurrentIndex(0);
@@ -209,12 +188,68 @@ void MainWindow::onReset()
 
 void MainWindow::onExport()
 {
-    // Task 5: real export wiring (Db::writeExportCsv + status bar path).
-    statusBar()->showMessage(tr("Export not wired yet"));
+    const QDir exportDir(QDir(QCoreApplication::applicationDirPath())
+                             .absoluteFilePath(QStringLiteral("../../reports/export")));
+    if (!exportDir.exists())
+        QDir().mkpath(exportDir.absolutePath());
+    const QString path = exportDir.absoluteFilePath(
+        QStringLiteral("export_") + QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss")
+        + QStringLiteral(".csv"));
+    const bool ok = Db::writeExportCsv(
+        path,
+        provinceCombo->currentIndex() == 0 ? QString() : provinceCombo->currentText(),
+        cityCombo->currentIndex() == 0 ? QString() : cityCombo->currentText(),
+        technologyCombo->currentIndex() == 0 ? QString() : technologyCombo->currentText(),
+        operatorCombo->currentIndex() == 0 ? QString() : operatorCombo->currentText());
+    statusBar()->showMessage(ok ? QStringLiteral("Exported: ") + path
+                                : QStringLiteral("Export failed"));
 }
 
-void MainWindow::onProvinceChanged(int /*index*/)
+void MainWindow::onProvinceChanged(int index)
 {
-    // Task 5: cascading city list (All -> full list, province -> its cities).
-    fillCombo(cityCombo, QStringList{});
+    // Cascade: city list narrows to the selected province ("All" keeps all).
+    if (index <= 0)
+        repopulateCombo(cityCombo, Db::citiesFor(QString()));
+    else
+        repopulateCombo(cityCombo, Db::citiesFor(provinceCombo->itemText(index)));
+}
+
+void MainWindow::refreshChart()
+{
+    auto* chart = signalChart->chart();
+    chart->removeAllSeries();
+
+    const auto group = chartGroupBy->currentIndex() == 0
+                           ? QStringLiteral("operator")
+                           : QStringLiteral("technology");
+    const auto current = [](QComboBox* combo) {
+        return combo->currentIndex() == 0 ? QString() : combo->currentText();
+    };
+    const auto points = Db::avgBy(group, current(provinceCombo), current(cityCombo),
+                                  current(technologyCombo), current(operatorCombo));
+
+    auto* series = new QBarSeries;
+    auto* barSet = new QBarSet(tr("Avg signal (dBm)"));
+    QStringList categories;
+    for (const auto& point : points) {
+        categories << point.first;
+        *barSet << point.second;
+    }
+    series->append(barSet);
+    chart->addSeries(series);
+
+    auto* axisX = new QBarCategoryAxis;
+    axisX->append(categories);
+    chart->addAxis(axisX, Qt::AlignBottom);
+    series->attachAxis(axisX);
+
+    auto* axisY = new QValueAxis;
+    axisY->setRange(-120, -50);
+    axisY->setTitleText(QStringLiteral("dBm"));
+    chart->addAxis(axisY, Qt::AlignLeft);
+    series->attachAxis(axisY);
+
+    chart->setTitle(group == QStringLiteral("operator")
+                        ? tr("Average Signal Strength by Operator")
+                        : tr("Average Signal Strength by Technology"));
 }

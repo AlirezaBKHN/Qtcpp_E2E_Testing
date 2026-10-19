@@ -5,6 +5,7 @@
 #include <QSet>
 #include <QSqlDatabase>
 #include <QSqlQuery>
+#include <QTextStream>
 #include <QVariant>
 
 #include "../src/db.h"
@@ -108,6 +109,46 @@ int main(int argc, char* argv[])
     QFile::remove(QString::fromLatin1(kDbPath));
     CHECK(Db::init(QString::fromLatin1(kDbPath)));
     CHECK(countRows() == 1500);
+
+    // 7. writeExportCsv writes header + one line per filtered row.
+    {
+        const QString path = "export_test.csv";
+        QFile::remove(path);
+        const auto rows = Db::queryFilters("Fars", QString(), QString(), QString());
+        CHECK(!rows.isEmpty());
+        CHECK(Db::writeExportCsv(path, "Fars", QString(), QString(), QString()));
+        CHECK(QFile::exists(path));
+        QFile file(path);
+        CHECK(file.open(QIODevice::ReadOnly | QIODevice::Text));
+        QTextStream in(&file);
+        CHECK(in.readLine() ==
+              "id,province,city,operator,technology,signal_strength,timestamp");
+        int dataLines = 0;
+        while (!in.atEnd()) {
+            if (!in.readLine().trimmed().isEmpty())
+                ++dataLines;
+        }
+        CHECK(dataLines == rows.size());
+        file.close();
+        QFile::remove(path);
+    }
+
+    // 8. Zero-row export still creates a header-only file.
+    {
+        const QString path = "export_test_zero.csv";
+        QFile::remove(path);
+        CHECK(Db::writeExportCsv(path, "Fars", "Tabriz", QString(), QString()));
+        CHECK(QFile::exists(path));
+        QFile file(path);
+        CHECK(file.open(QIODevice::ReadOnly | QIODevice::Text));
+        QTextStream in(&file);
+        const QString first = in.readLine();
+        CHECK(first ==
+              "id,province,city,operator,technology,signal_strength,timestamp");
+        CHECK(in.readLine().trimmed().isEmpty());
+        file.close();
+        QFile::remove(path);
+    }
 
     QFile::remove(QString::fromLatin1(kDbPath));
     if (failures > 0) {

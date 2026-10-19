@@ -1,11 +1,15 @@
 #include "db.h"
 
 #include <QDateTime>
+#include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QRandomGenerator>
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
+#include <QTextStream>
+#include <QStringConverter>
 #include <QVariant>
 
 #include <random>
@@ -170,8 +174,7 @@ FilterBindings Db::queryFilters(const QString& province, const QString& city,
 QVector<LabelAvg> Db::avgBy(const QString& groupColumn, const QString& province,
                             const QString& city, const QString& technology,
                             const QString& operatorName)
-{
-    QVector<LabelAvg> points;
+{    QVector<LabelAvg> points;
     if (groupColumn != QLatin1String("operator") && groupColumn != QLatin1String("technology"))
         return points;
 
@@ -205,4 +208,30 @@ QVector<LabelAvg> Db::avgBy(const QString& groupColumn, const QString& province,
     while (q.next())
         points.append({q.value(0).toString(), q.value(1).toDouble()});
     return points;
+}
+
+bool Db::writeExportCsv(const QString& path, const QString& province,
+                        const QString& city, const QString& technology,
+                        const QString& operatorName)
+{
+    QDir().mkpath(QFileInfo(path).absolutePath());
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate))
+        return false;
+
+    QTextStream out(&file);
+    out.setEncoding(QStringConverter::Utf8);
+    out << "id,province,city,operator,technology,signal_strength,timestamp\n";
+    auto csvCell = [](const QString& value) {
+        if (value.contains(',') || value.contains('"') || value.contains('\n'))
+            return QLatin1Char('"') + QString(value).replace("\"", "\"\"") + QLatin1Char('"');
+        return value;
+    };
+    for (const auto& row : queryFilters(province, city, technology, operatorName)) {
+        QStringList cells;
+        for (const auto& field : row)
+            cells << csvCell(field.toString());
+        out << cells.join(',') << '\n';
+    }
+    return true;
 }

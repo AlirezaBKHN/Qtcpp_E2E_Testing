@@ -29,4 +29,11 @@ public:
     static QVector<LabelAvg> avgBy(const QString& groupColumn, const QString& province,
                                    const QString& city, const QString& technology,
                                    const QString& operatorName);
+
+    // Writes the current (filtered) view as CSV: one header line + one line
+    // per row. Returns false if the file cannot be created. Zero-row filters
+    // still produce a header-only file.
+    static bool writeExportCsv(const QString& path, const QString& province,
+                               const QString& city, const QString& technology,
+                               const QString& operatorName);
 };
