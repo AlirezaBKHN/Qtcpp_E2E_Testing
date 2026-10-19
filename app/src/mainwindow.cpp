@@ -168,6 +168,8 @@ void MainWindow::onSearch()
         for (int c = 0; c < row.size() && c < signalTable->columnCount(); ++c)
             signalTable->setItem(r, c, new QTableWidgetItem(row.at(c).toString()));
     }
+    statusBar()->showMessage(
+        QStringLiteral("Showing %1 rows").arg(rows.size()));
     refreshChart();
 }
 

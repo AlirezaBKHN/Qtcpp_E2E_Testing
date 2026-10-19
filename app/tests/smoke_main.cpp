@@ -26,7 +26,17 @@ void SmokeMain::mandatoryIdentifiersPresent()
         QCOMPARE(QString::fromLatin1(id), found->objectName());
         QCOMPARE(QString::fromLatin1(id), found->accessibleName());
     }
+
+    // After the initial fill, the status bar must report the row count so UI
+    // automation can read a stable, fast count (UIA realizes only visible rows).
     QTest::qWait(50);
+    for (auto* bar : w.findChildren<QStatusBar*>()) {
+        const QString text = bar->currentMessage();
+        QVERIFY2(text.startsWith(QStringLiteral("Showing ")),
+                 qPrintable(QString("status bar says: %1").arg(text)));
+        QVERIFY2(text.contains(QStringLiteral(" rows")),
+                 qPrintable(QString("status bar says: %1").arg(text)));
+    }
 }
 
 int main(int argc, char** argv)

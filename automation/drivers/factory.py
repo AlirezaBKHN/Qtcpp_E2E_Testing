@@ -12,11 +12,23 @@ import config as C
 _driver = None
 
 
+_LINGERING_APP = "IranSignalTracker.exe"
+
+
+def _kill_lingering() -> None:
+    """Never hand a session a leftover app window."""
+    subprocess.run(["taskkill", "/F", "/IM", _LINGERING_APP],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
 def _caps_appium() -> dict[str, Any]:
     return {
         "platformName": "Windows",
         "appium:automationName": "Windows",
         "appium:app": str(C.APP_EXE),
+        # Kill the app process when the session ends, so tests never leave
+        # leftovers that subsequent sessions might attach to.
+        "ms:forcequit": True,
     }
 
 
@@ -53,6 +65,8 @@ def get_driver():
     global _driver
     if _driver is not None:
         return _driver
+
+    _kill_lingering()
 
     if C.DRIVER_MODE == "direct":
         _ensure_wad_running()
