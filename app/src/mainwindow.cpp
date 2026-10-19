@@ -9,6 +9,7 @@
 
 #include <QDateTime>
 #include <QDir>
+#include <QFont>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QPushButton>
@@ -115,6 +116,21 @@ MainWindow::MainWindow(QWidget* parent)
     signalChart = new QChartView(chart, this);
     makeStable(signalChart, "signalChart");
     signalChart->setRenderHint(QPainter::Antialiasing);
+
+    // Persistent axes: created exactly once; refreshChart only replaces the
+    // series and refills categories. Creating axes per-refresh piled them up
+    // (overlapping dot-elided labels, broken resize repaint).
+    axisX = new QBarCategoryAxis;
+    axisY = new QValueAxis;
+    axisY->setRange(-120, -50);
+    axisY->setTitleText(QStringLiteral("dBm"));
+    axisY->setLabelFormat(QStringLiteral("%d"));
+    QFont axisFont(QStringLiteral("Segoe UI"), 9);
+    axisX->setLabelsFont(axisFont);
+    axisY->setLabelsFont(axisFont);
+    axisY->setTickCount(8);
+    chart->addAxis(axisX, Qt::AlignBottom);
+    chart->addAxis(axisY, Qt::AlignLeft);
 
     auto* chartRow = new QHBoxLayout;
     chartRow->addWidget(chartGroupBy);
@@ -233,6 +249,7 @@ void MainWindow::refreshChart()
     auto* series = new QBarSeries;
     auto* barSet = new QBarSet(tr("Avg signal (dBm)"));
     QStringList categories;
+    axisX->clear();
     for (const auto& point : points) {
         categories << point.first;
         *barSet << point.second;
@@ -240,16 +257,9 @@ void MainWindow::refreshChart()
     series->append(barSet);
     chart->addSeries(series);
 
-    auto* axisX = new QBarCategoryAxis;
-    axisX->append(categories);
-    chart->addAxis(axisX, Qt::AlignBottom);
     series->attachAxis(axisX);
-
-    auto* axisY = new QValueAxis;
-    axisY->setRange(-120, -50);
-    axisY->setTitleText(QStringLiteral("dBm"));
-    chart->addAxis(axisY, Qt::AlignLeft);
     series->attachAxis(axisY);
+    axisX->append(categories);
 
     chart->setTitle(group == QStringLiteral("operator")
                         ? tr("Average Signal Strength by Operator")

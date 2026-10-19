@@ -6,7 +6,10 @@
 #include <QStatusBar>
 #include <QTableWidget>
 
+class QAbstractAxis;
+class QBarCategoryAxis;
 class QChartView;
+class QValueAxis;
 
 class MainWindow : public QMainWindow
 {
@@ -37,4 +40,7 @@ private:
 
     QTableWidget* signalTable = nullptr;
     QChartView* signalChart = nullptr;
+
+    QBarCategoryAxis* axisX = nullptr;
+    QValueAxis* axisY = nullptr;
 };

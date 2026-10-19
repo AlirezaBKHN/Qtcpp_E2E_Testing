@@ -1,5 +1,7 @@
 #include <QApplication>
-#include <QTest>
+#include <QPushButton>
+#include <QtCharts/QChartView>
+#include <QtTest>
 #include "mainwindow.h"
 
 // Smoke: MainWindow must construct with every mandatory stable identifier,
@@ -36,6 +38,33 @@ void SmokeMain::mandatoryIdentifiersPresent()
                  qPrintable(QString("status bar says: %1").arg(text)));
         QVERIFY2(text.contains(QStringLiteral(" rows")),
                  qPrintable(QString("status bar says: %1").arg(text)));
+    }
+
+    // The chart must stay healthy across repeated searches: exactly one
+    // series, exactly one axis per edge, readable label font.
+    auto* chartView = w.findChild<QChartView*>(QString::fromLatin1("signalChart"));
+    QVERIFY(chartView != nullptr);
+    auto* chart = chartView->chart();
+    QVERIFY(chart != nullptr);
+
+    // Second full search refresh must not pile up axes.
+    for (auto* bar : w.findChildren<QStatusBar*>()) {
+        const QString text = bar->currentMessage();
+        if (text.startsWith(QStringLiteral("Showing ")))
+            QVERIFY2(w.findChild<QPushButton*>(QString::fromLatin1("searchButton")) != nullptr,
+                     "search button missing");
+    }
+    QTest::qWait(20);
+    {
+        QPushButton* search = w.findChild<QPushButton*>(QString::fromLatin1("searchButton"));
+        QVERIFY(search != nullptr);
+        search->click(); // refresh #2 (also exercises the refres-chart path)
+        QTest::qWait(20);
+        QCOMPARE(chart->series().size(), 1);
+        QCOMPARE(chart->axes(Qt::Horizontal).size(), 1);
+        QCOMPARE(chart->axes(Qt::Vertical).size(), 1);
+        const auto axesY = chart->axes(Qt::Vertical);
+        QCOMPARE(axesY.first()->labelsFont().pointSize(), 9);
     }
 }
 
