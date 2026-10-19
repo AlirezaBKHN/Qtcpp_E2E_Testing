@@ -22,6 +22,7 @@ from pathlib import Path
 
 import config as C
 from drivers.factory import get_driver, quit_driver
+from drivers.foreground import focus_app
 from dsl.export_result import ExportResult
 from pageobjects.chart_widget import SignalChart
 from pageobjects.main_page import MainPage
@@ -43,6 +44,11 @@ class SignalTrackerDsl:
             time.sleep(0.5)
             main = self._driver.find_elements("xpath", MainPage.WINDOW_XPATH)
         assert main, "Iran Signal Tracker window did not appear"
+        # The window may open BEHIND other application windows (a terminal,
+        # the agent's chat). Every later keystroke/click would land there
+        # (observed: typing landed in a chat window). Force the OS foreground
+        # to the app before any interaction in the session.
+        focus_app()
         return self
 
     def quit(self) -> None:

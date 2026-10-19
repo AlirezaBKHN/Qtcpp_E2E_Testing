@@ -25,29 +25,19 @@ class MainPage:
 
     # -- filters -------------------------------------------------------
     def select_combo(self, control: str, value: str) -> None:
-        """Select `value` in the combo `control` (cascades city fresh)."""
-        el = self._el(control)
-        # Strategy A: expanded list item click (WinAppDriver sees Qt combo
-        # items as ListItem elements once the combo is expanded).
-        try:
-            el.click()  # expand
-            items = self._driver.find_elements("name", value)
-            for item in items:
-                name = item.get_attribute("Name")
-                if name == value:
-                    item.click()
-                    # collapse any leftover pop-up
-                    try:
-                        el.click()
-                    except Exception:  # noqa: BLE001
-                        pass
-                    return
-        except Exception:  # noqa: BLE001
-            pass
-        # Strategy B: keyboard input into the combo itself.
-        el.send_keys(value)
-        el.send_keys("\ue00c")  # RETURN? WinAppDriver returns key: "\r\n" fallback
-        el.send_keys("")
+        """Select `value` in the combo `control` (cascades happen on change).
+
+        Keyboard-first: typing into a closed non-editable QComboBox selects
+        the matching item (type-ahead) and fires currentIndexChanged, which
+        also drives the city cascade. This avoids the popup-item ambiguity
+        of element clicks: once the table is visible, table cells share the
+        item's Name (e.g. 'Tehran'), so finding elements by Name can match
+        and click a table cell instead of the popup item.
+
+        Requires the app to be foreground (enforced in launch()): WAD
+        delivers keystrokes to whatever window has keyboard focus.
+        """
+        self._el(control).send_keys(value)
 
     def apply_filters(self, province: str | None = None, city: str | None = None,
                       technology: str | None = None, operator: str | None = None) -> None:
@@ -61,6 +51,11 @@ class MainPage:
             self.select_combo("operatorCombo", operator)
 
     # -- buttons -------------------------------------------------------
+    # Note: element.click() is only safe because launch() forces the app to
+    # the OS foreground first (see drivers/foreground.py). Without it the
+    # click and the keystrokes land on whatever window covers the app (a
+    # terminal, a chat), which is exactly the failure mode that masqueraded
+    # as "Invoke pattern dropped the click" for hours.
     def click_search(self) -> None:
         self._el("searchButton").click()
 
