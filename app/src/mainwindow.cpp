@@ -112,6 +112,9 @@ MainWindow::MainWindow(QWidget* parent)
 
     auto* chart = new QChart;
     chart->setTitle(tr("Average Signal Strength"));
+    // Legend on the right: at the default pane height a bottom legend ate
+    // the plot band and every axis label was elided to dots.
+    chart->legend()->setAlignment(Qt::AlignRight);
     chart->legend()->show();
     signalChart = new QChartView(chart, this);
     makeStable(signalChart, "signalChart");
@@ -122,13 +125,14 @@ MainWindow::MainWindow(QWidget* parent)
     // (overlapping dot-elided labels, broken resize repaint).
     axisX = new QBarCategoryAxis;
     axisY = new QValueAxis;
-    axisY->setRange(-120, -50);
-    axisY->setTitleText(QStringLiteral("dBm"));
+    // Quality scale 0..100; 5 ticks = flat 25% steps.
+    axisY->setRange(0, 100);
+    axisY->setTitleText(QStringLiteral("Quality (%)"));
     axisY->setLabelFormat(QStringLiteral("%d"));
     QFont axisFont(QStringLiteral("Segoe UI"), 9);
     axisX->setLabelsFont(axisFont);
     axisY->setLabelsFont(axisFont);
-    axisY->setTickCount(8);
+    axisY->setTickCount(5);
     chart->addAxis(axisX, Qt::AlignBottom);
     chart->addAxis(axisY, Qt::AlignLeft);
 
@@ -145,6 +149,10 @@ MainWindow::MainWindow(QWidget* parent)
     splitter->addWidget(chartPane);
     splitter->setStretchFactor(0, 5);
     splitter->setStretchFactor(1, 3);
+    // Initial pane sizes: with stretch alone the chart pane came up as a
+    // ~180px sliver, leaving a ~30px plot band where every axis label was
+    // elided to "…" (screenshot evidence). 380/260 keeps the plot readable.
+    splitter->setSizes({380, 260});
 
     auto* central = new QWidget(this);
     auto* centralLayout = new QVBoxLayout(central);
@@ -206,6 +214,7 @@ void MainWindow::onReset()
 
 void MainWindow::onExport()
 {
+    qWarning() << "onExport invoked";
     const QDir exportDir(QDir(QCoreApplication::applicationDirPath())
                              .absoluteFilePath(QStringLiteral("../../reports/export")));
     if (!exportDir.exists())
@@ -247,21 +256,42 @@ void MainWindow::refreshChart()
                                   current(technologyCombo), current(operatorCombo));
 
     auto* series = new QBarSeries;
-    auto* barSet = new QBarSet(tr("Avg signal (dBm)"));
+    // Value labels on each bar (owner requirement). Qt bar labels are
+    // "@value"-tagged text rendered with 'g'-style significant digits;
+    // a printf format like "%.1f" has no tag, renders literally and the
+    // rich-text item drops it (observed: no labels at all).
+    series->setLabelsVisible(true);
+    series->setLabelsPosition(QAbstractBarSeries::LabelsOutsideEnd);
+    series->setLabelsFormat(QStringLiteral("@value"));
+    series->setLabelsPrecision(3);
+    auto* barSet = new QBarSet(tr("Quality (%)"));
+    // Theme picks the label brush from the *opposite end* of the bar
+    // gradient - near-white for a blue bar - over a white plot background
+    // the labels were present but invisible. Explicit black matches every
+    // other chart label.
+    barSet->setLabelBrush(Qt::black);
     QStringList categories;
-    axisX->clear();
+    // Bars encode a 0..100 quality metric, not raw dBm: a bar-series item
+    // draws bars from the implied ZERO line, and for an all-negative dBm
+    // domain (-120..-40) that line sits above the plot — bars hung from the
+    // top edge and every label collapsed onto one clipped line (screenshot
+    // + scene-dump evidence). quality = (dBm + 120) / 70 * 100.
     for (const auto& point : points) {
         categories << point.first;
-        *barSet << point.second;
+        *barSet << ((point.second + 120.0) / 0.7);
     }
+    // Categories MUST be set before the series attaches: an attached
+    // category axis synced to a series with no categories auto-generates
+    // index placeholders ("1","2",…), doubling the slots and misaligning
+    // every label (screenshot: dots across the whole axis).
+    axisX->clear();
+    axisX->append(categories);
     series->append(barSet);
     chart->addSeries(series);
-
     series->attachAxis(axisX);
     series->attachAxis(axisY);
-    axisX->append(categories);
 
     chart->setTitle(group == QStringLiteral("operator")
-                        ? tr("Average Signal Strength by Operator")
-                        : tr("Average Signal Strength by Technology"));
+                        ? tr("Average Signal Quality by Operator")
+                        : tr("Average Signal Quality by Technology"));
 }
