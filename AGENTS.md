@@ -42,7 +42,13 @@ C++ toolchain paths are absolute defaults in `scripts/build.ps1` (overridable vi
   strategies casually; re-freeze with `automation/tools/inspect_ui.py` (run with Appium up).
 - **WAD quirks baked into the code:** XPath has `contains()` but NO `starts-with()` (silent
   empty result); row counts come from the status-bar text `Showing N rows` (UIA virtualizes
-  table rows — never count `DataItem`s); combos are driven by expand→list-item click.
+  table rows — never count `DataItem`s); **the app must be OS-foreground before any
+  interaction** — WAD sends keystrokes to the focused window and clicks to whatever sits at
+  the element's screen coordinates, otherwise they land in OTHER applications (observed:
+  typed test strings ended up inside a chat window). `launch()` enforces this via
+  `drivers/foreground.py` (ALT-unlock + SetForegroundWindow); combos select via keyboard
+  type-ahead — with the table visible, popup items share Names with table cells, so
+  element-click matching is ambiguous.
 - **Qt runtime must be deployed** (`windeployqt --compiler-runtime` + `Qt6Test.dll` copy).
   `scripts/build.ps1` handles it; without it the exe fails with missing-DLL dialogs when
   launched outside a shell with Qt on PATH — exactly how WinAppDriver launches it.
@@ -52,8 +58,15 @@ C++ toolchain paths are absolute defaults in `scripts/build.ps1` (overridable vi
   absent. Changing seed values invalidates committed `database/signaltracker.db` — regenerate
   via `app_dbgen` (`& app\build-mingw\app_dbgen.exe database\signaltracker.db`).
 - **Chart axes are persistent** (created once in `MainWindow` ctor); `refreshChart()` replaces
-  only series/categories. Creating axes per refresh piled them up → dot labels + broken resize.
-  `app_smoke` pins: exactly 1 series, 1 axis per edge, 9pt labels.
+  only series/categories and **sets categories BEFORE attaching** — an attached category axis
+  synced to a series with no categories auto-generates "1..n" placeholder slots. Bars encode a
+  **0–100 quality metric** (`(dBm+120)/0.7`), NOT raw dBm: the Qt bar canvas draws bars from
+  the implied zero line, so an all-negative dBm domain clips bars+labels at the top edge.
+  Labels must use the `"@value"` tag (`"%.1f"` renders literally and is dropped) with an
+  explicit black `labelBrush` (theme picks near-white for blue bars). Splitter starts
+  380/260 or the chart pane is an unreadable sliver. `app_smoke` pins: 1 series, 1 axis per
+  edge, 9pt labels, value labels `@value`/precision 3/black brush, quality=transform of
+  `Db::avgBy`, axis 0..100 tickCount 5.
 - **Sessions must not leak app windows**: factory kills lingering `IranSignalTracker.exe`
   before opening a session and sets `ms:forcequit`; keep that behavior.
 

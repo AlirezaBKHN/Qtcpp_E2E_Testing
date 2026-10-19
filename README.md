@@ -89,7 +89,9 @@ allure generate ..\reports\allure-results -o ..\reports\allure-report --clean
 Main window with Province / City / Technology / Operator filters (each has an `All` entry; City
 cascades by Province), Search / Refresh / Reset / Export CSV buttons, a results table
 (ID, Province, City, Operator, Technology, Signal Strength, Timestamp), and a bar chart of
-average signal grouped by operator or technology. Export writes the current view to
+**average signal quality (0–100 %)** grouped by operator or technology — quality is
+`(avg dBm + 120) / 0.7`, with the dBm equivalent recoverable from the CSV export and each
+bar carrying a readable value label. Export writes the current view to
 `reports/export/export_<timestamp>.csv` and shows the path in the status bar, which also
 always states `Showing N rows`.
 
