@@ -1,0 +1,18 @@
+# Build trees
+build*/
+
+# Test & report artifacts (tracked: reports/export/.gitkeep, committed DB)
+reports/allure-results/
+reports/allure-report/
+reports/export/*.csv
+*.db-journal
+
+# Python
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Harness scaffolding (not part of the project)
+.agents/
+.opencode/
+skills-lock.json
