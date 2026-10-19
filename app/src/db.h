@@ -15,6 +15,11 @@ public:
     // Opens (creating + seeding if absent) signaltracker.db.
     static bool init(const QString& dbPath);
 
+    // Stable domain map; single source of truth for the UI and tests.
+    static QStringList provinces();
+    static QStringList citiesFor(const QString& province);
+    static bool isProvince(const QString& province);
+
     // Filtered rows; empty argument = no filter on that column.
     static FilterBindings queryFilters(const QString& province, const QString& city,
                                        const QString& technology,

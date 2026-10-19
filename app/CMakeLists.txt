@@ -26,5 +26,19 @@ qt_add_executable(app_smoke
 target_include_directories(app_smoke PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(app_smoke PRIVATE Qt6::Widgets Qt6::Charts Qt6::Sql Qt6::Test)
 
+qt_add_executable(app_dbtest
+    tests/db_test.cpp
+    src/db.h
+    src/db.cpp
+)
+target_include_directories(app_dbtest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(app_dbtest PRIVATE Qt6::Sql)
+
+# Generates the committed database/signaltracker.db artifact.
+qt_add_executable(app_dbgen tools/dbgen.cpp src/db.h src/db.cpp)
+target_include_directories(app_dbgen PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(app_dbgen PRIVATE Qt6::Sql)
+
 enable_testing()
 add_test(NAME smoke COMMAND app_smoke)
+add_test(NAME db_test COMMAND app_dbtest)
