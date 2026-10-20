@@ -2,7 +2,8 @@
 
 A standalone **Qt 6 Widgets** desktop application ("Iran Signal Tracker", SQLite-backed, mock
 telecom data) and a complete **Appium + WinAppDriver E2E automation stack** in front of it:
-a human-readable DSL, page objects, 24 pytest tests, and a per-run Allure report.
+a human-readable DSL, page objects, 25 pytest tests (one intentional demo
+failure, TC019), and a per-run Allure report.
 
 The app opens on a **sign-in gate** (register / login); the main window is tabbed (Home,
 Network Data, Dashboard, Reports, plus an admin-only Users tab). The E2E tests never touch
@@ -67,6 +68,7 @@ powershell -ExecutionPolicy Bypass -File scripts\run-appium.ps1     # server on 
 $env:DRIVER_MODE = 'direct'    # fallback: talk to WinAppDriver on :4729 without Appium
 
 # 5) the 15 E2E tests (TC001-TC015)
+# 5) Tests: pick a suite interactively (automation\suites.json) or -Suite all
 powershell -ExecutionPolicy Bypass -File scripts\run-tests.ps1
 
 # 6) Allure report (newest run without one; -Run <name> for an older one)
@@ -127,7 +129,7 @@ accounts (removing `admin` is refused by the app).
   readouts mirror their DISPLAYED text in `accessibleName` (the only readable surface WAD
   offers).
 
-## The 18 E2E tests
+## The 19 E2E tests
 
 `TC001` launch + register-first login · `TC002` province filter · `TC003` city filter
 (cascade, Fars→Shiraz) · `TC004` technology filter · `TC005` operator filter · `TC006`
@@ -137,7 +139,9 @@ combined filters · `TC007` reset · `TC008` refresh row-count equality · `TC00
 trend / weakest cells · `TC015` users admin (remove user, admin guard) · `TC016`
 pagination (page windows cross-checked against the CSV export, page-size selector) ·
 `TC017` row-id DSL (`should_contain_row` / `should_not_contain_row` over the realized ID
-column) · `TC018` empty fixture (sign-in works on 0 cells: `Page 1 of 1`, `Showing 0 rows`).
+column) · `TC018` empty fixture (sign-in works on 0 cells: `Page 1 of 1`, `Showing 0 rows`) ·
+`TC019` **intentional demo failure** (`Page 1 of 999` vs the real `Page 1 of 51` — never
+"fix" it; expected full-suite: 24 passed, 1 failed).
 Catalog with preconditions/steps/expected results: `docs/test-cases/`. Failures attach a
 screenshot to the Allure report.
 

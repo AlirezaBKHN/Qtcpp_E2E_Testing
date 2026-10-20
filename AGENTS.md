@@ -21,7 +21,7 @@ pytest/Appium/WinAppDriver E2E stack. Two independent deliverables:
 powershell -ExecutionPolicy Bypass -File scripts\build.ps1      # configure+build+windeployqt
 powershell -ExecutionPolicy Bypass -File scripts\run-ctest.ps1  # app_smoke + app_dbtest
 powershell -ExecutionPolicy Bypass -File scripts\run-appium.ps1 # appium :4723 (keeps console open)
-powershell -ExecutionPolicy Bypass -File scripts\run-tests.ps1  # 18 E2E + 6 unit -> reports\runs\<ts>_<branch>_<commit>\
+powershell -ExecutionPolicy Bypass -File scripts\run-tests.ps1  # suite menu or -Suite <name>|all; appium auto-start; report auto-opens
 powershell -ExecutionPolicy Bypass -File scripts\run-allure.ps1 # report for newest run w/o one (add -Serve to open, -Run <name> for older)
 powershell -ExecutionPolicy Bypass -File scripts\run-app.ps1    # launch the exe
 ```
@@ -81,6 +81,12 @@ C++ toolchain paths are absolute defaults in `scripts/build.ps1` (overridable vi
 - **Readout contract:** read-only KPI/status readouts keep `objectName` = stable id but set
   `accessibleName` to the DISPLAYED text (`'49.8%'`, `'10080 cells'`, `'Showing N rows'`) —
   the only readable surface WAD offers. `app_smoke` pins it.
+- **Suites & the demo failure:** `automation/suites.json` maps suite names to test-file
+  names (relative to `automation/tests`, `.py` optional). `run-tests.ps1` offers an
+  interactive menu or `-Suite <name>|all`, pre-flights the app build and Appium (:4723,
+  skipped with `DRIVER_MODE=direct`), then generates the run's report and opens
+  `index.html` in the default browser. **TC019 is an INTENTIONAL demo failure — never
+  "fix" it.** Expected full-suite result: 24 passed, 1 failed.
 - **Per-test DB isolation (fixture system, spec 2026-10-20):** `database/fixtures/` holds the
   COMMITTED `.db` fixtures — the only source of truth; the fixtures' bytes must stay
   byte-clean across runs (never open one read-write). `database/signaltracker.db` is a

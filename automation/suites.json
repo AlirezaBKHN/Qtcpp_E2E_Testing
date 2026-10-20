@@ -1,0 +1,37 @@
+{
+  "smoke": [
+    "test_tc001_launch",
+    "test_tc012_login",
+    "test_tc002_province_filter",
+    "test_tc009_export_csv"
+  ],
+  "auth": [
+    "test_tc011_register",
+    "test_tc012_login",
+    "test_tc013_logout",
+    "test_tc015_users_admin"
+  ],
+  "filters": [
+    "test_tc002_province_filter",
+    "test_tc003_city_filter",
+    "test_tc004_technology_filter",
+    "test_tc005_operator_filter",
+    "test_tc006_combined_filter",
+    "test_tc007_reset"
+  ],
+  "reporting": [
+    "test_tc009_export_csv",
+    "test_tc010_chart_visibility",
+    "test_tc014_dashboard"
+  ],
+  "data": [
+    "test_tc008_refresh",
+    "test_tc016_pagination",
+    "test_tc017_row_ids",
+    "test_tc018_empty_fixture",
+    "test_tc019_demo_failure"
+  ],
+  "unit": [
+    "test_fixtures_unit"
+  ]
+}
