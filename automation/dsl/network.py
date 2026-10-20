@@ -67,3 +67,24 @@ class NetworkDsl:
 
     def row_count(self) -> int:
         return self._main.row_count_text()
+
+    # -- pager (spec 2026-10-20) -----------------------------------------
+    PAGE_SIZES = ("50", "100", "200", "1000")
+
+    def next_page(self) -> "NetworkDsl":
+        self._main.click_next_page()
+        return self
+
+    def prev_page(self) -> "NetworkDsl":
+        self._main.click_prev_page()
+        return self
+
+    def page_label(self) -> str:
+        return self._main.page_label_text()
+
+    def page_size(self, value: str) -> "NetworkDsl":
+        if value not in self.PAGE_SIZES:
+            raise KeyError(
+                f"unknown page size {value!r}; known: {list(self.PAGE_SIZES)}")
+        self._main.select_page_size(value)
+        return self

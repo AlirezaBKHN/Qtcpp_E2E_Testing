@@ -38,3 +38,29 @@ class SignalTable:
         assert any(text in n for n in names), \
             f"table data does not contain {text!r}; realized cells: {names[:20]}"
         return self
+
+    # -- row-id readout (spec 2026-10-20) -------------------------------
+    def ids(self) -> list[int]:
+        """Realized ID-column cells of the CURRENT page (row-major stride
+        7, header row excluded). Small bounded read: pages hold at most
+        the selected page size."""
+        names = self._data_items()
+        if names and names[0] == "ID":  # header cell, usersTable-style
+            names = names[1:]
+        return [int(n) for n in names[0::7]]
+
+    def realized_row_count(self) -> int:
+        """Rows actually realized in the UIA tree for the current page."""
+        return len(self.ids())
+
+    def should_contain_row(self, id: int) -> "SignalTable":
+        realized = self.ids()
+        assert id in realized, \
+            f"table page does not contain row id {id}; realized ids: {realized[:20]}"
+        return self
+
+    def should_not_contain_row(self, id: int) -> "SignalTable":
+        realized = self.ids()
+        assert id not in realized, \
+            f"table page unexpectedly contains row id {id}; realized ids: {realized[:20]}"
+        return self

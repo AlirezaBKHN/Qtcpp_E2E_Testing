@@ -4,7 +4,7 @@ from __future__ import annotations
 import time
 
 from drivers import keyboard
-from pageobjects.resolve_element import find, find_within
+from pageobjects.resolve_element import find, find_within, read_text
 
 COMBOS = ("provinceCombo", "cityCombo", "technologyCombo", "operatorCombo")
 
@@ -27,6 +27,10 @@ class MainPage:
     _SECTION_MEMBERS = COMBOS + ("searchButton", "refreshButton",
                                  "resetButton", "exportButton")
 
+    PAGER_SECTION_ID = "pagerSection"
+    _PAGER_MEMBERS = ("pageSizeCombo", "prevPageButton", "nextPageButton",
+                      "pageLabel")  # readout: "Page k of n"
+
     def __init__(self, driver):
         self._driver = driver
         self._elements: dict[str, object] = {}
@@ -37,6 +41,9 @@ class MainPage:
             if control in self._SECTION_MEMBERS:
                 self._elements[control] = find_within(
                     self._driver, self.SECTION_ID, control)
+            elif control in self._PAGER_MEMBERS:
+                self._elements[control] = find_within(
+                    self._driver, self.PAGER_SECTION_ID, control)
             else:
                 self._elements[control] = find(self._driver, control)
         return self._elements[control]
@@ -93,6 +100,20 @@ class MainPage:
 
     def click_export(self) -> None:
         self._el("exportButton").click()
+
+    # -- pager (spec 2026-10-20) ---------------------------------------
+    def click_next_page(self) -> None:
+        self._el("nextPageButton").click()
+
+    def click_prev_page(self) -> None:
+        self._el("prevPageButton").click()
+
+    def page_label_text(self) -> str:
+        """The pager readout's displayed text, e.g. 'Page 2 of 51'."""
+        return read_text(self._el("pageLabel"))
+
+    def select_page_size(self, value: str) -> None:
+        self.select_combo("pageSizeCombo", value)
 
     # -- readouts ------------------------------------------------------
     def is_visible(self) -> bool:

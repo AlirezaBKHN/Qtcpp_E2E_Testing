@@ -31,6 +31,7 @@ XPATH_BY_AID = "//Edit[contains(@AutomationId,'%s')]"
 READOUT_IDS = (
     "signinStatus", "registerStatus", "currentUserLabel",
     "kpiAvgQuality", "kpiCells", "kpiBestOperator", "kpiWorstOperator",
+    "pageLabel",  # pager readout, "Page k of n" (spec 2026-10-20)
 )
 
 CONTROLS: dict[str, list[tuple[str, str]]] = {}
@@ -58,6 +59,8 @@ for _key in (
     # 0.02s vs 11-38s from the window root, whose walk carries the
     # 10,080-row table).
     "filterSection", "headerSection",
+    # Pager (spec 2026-10-20): section + controls; pageLabel is a READOUT.
+    "pagerSection", "pageSizeCombo", "prevPageButton", "nextPageButton",
 ):
     CONTROLS[_key] = [(C.BY_NAME, _key), (C.BY_ID, _key)]
 for _key in READOUT_IDS:
