@@ -75,6 +75,18 @@ def test_migrate_idempotent_and_respects_existing_version(tmp_path):
     assert fixtures.migrate(work, mig) == 0    # second run: still nothing
 
 
+def test_duplicate_migration_numbers_raise(tmp_path):
+    # Two files sharing a number would silently skip the second (after the
+    # first sets user_version, `number <= version` gates it off) - the
+    # store must reject the folder loudly instead (Review Focus 2).
+    mig = tmp_path / "mig"
+    mig.mkdir()
+    (mig / "010_a.sql").write_text("SELECT 1;", encoding="utf-8")
+    (mig / "010_b.sql").write_text("SELECT 2;", encoding="utf-8")
+    with pytest.raises(ValueError, match="010"):
+        fixtures.migration_files(mig)
+
+
 def test_select_fixture_nodeid_wins_default_falls_back(tmp_path):
     mapping = {"default": "seed_full",
                "tests/test_tc018_empty_fixture.py::test_tc018_empty_fixture": "empty"}

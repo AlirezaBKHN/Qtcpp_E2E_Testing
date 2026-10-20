@@ -44,7 +44,12 @@ def select_fixture(nodeid: str, mapping: dict) -> str:
 
 
 def migration_files(directory: Path = MIGRATIONS_DIR) -> list[tuple[int, Path]]:
-    """`<number>_<name>.sql` files, sorted by number; others ignored."""
+    """`<number>_<name>.sql` files, sorted by number; others ignored.
+
+    Duplicate numbers are REJECTED loudly: after the first applies it sets
+    user_version, and the second would be silently gated off (invisible
+    schema divergence).
+    """
     found: list[tuple[int, Path]] = []
     if not directory.is_dir():
         return found
@@ -52,7 +57,14 @@ def migration_files(directory: Path = MIGRATIONS_DIR) -> list[tuple[int, Path]]:
         m = _MIGRATION_RE.match(path.name)
         if m:
             found.append((int(m.group(1)), path))
-    return sorted(found)
+    found.sort(key=lambda item: item[0])
+    numbers = [n for n, _ in found]
+    if len(set(numbers)) != len(numbers):
+        dupes = sorted({n for n in numbers if numbers.count(n) > 1})
+        raise ValueError(
+            f"duplicate migration number(s) {dupes} in {directory}: "
+            + ", ".join(p.name for _, p in found))
+    return found
 
 
 def migrate(db_path: Path, directory: Path = MIGRATIONS_DIR) -> int:
