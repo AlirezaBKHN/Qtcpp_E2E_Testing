@@ -49,6 +49,26 @@ def _read_text(el) -> str:
     return ""
 
 
+def _set_text(el, text: str) -> None:
+    """REPLACE a line-edit's content with `text`.
+
+    send_keys APPENDS (probed via TC012: a second fill accumulated the
+    previous attempts' text, so the 'valid' login actually submitted a
+    mangled username), so each fill clears first. clear() rides the UIA
+    ValuePattern; the keystroke fallback (select-all + delete) needs the
+    field focused, hence the click.
+    """
+    try:
+        el.clear()
+    except Exception:  # noqa: BLE001 - clear unsupported: keystroke path
+        from selenium.webdriver.common.keys import Keys
+
+        el.click()
+        el.send_keys(Keys.CONTROL + "a")
+        el.send_keys(Keys.DELETE)
+    el.send_keys(text)
+
+
 class SignInPage:
     """Owns every interaction on the signinWindow."""
 
@@ -77,8 +97,8 @@ class SignInPage:
 
     # -- actions (perform, no assertion) -------------------------------
     def fill(self, username: str, password: str) -> None:
-        self._el("usernameField").send_keys(username)
-        self._el("passwordField").send_keys(password)
+        _set_text(self._el("usernameField"), username)
+        _set_text(self._el("passwordField"), password)
 
     def click_login(self) -> None:
         self._el("loginButton").click()

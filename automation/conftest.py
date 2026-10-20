@@ -108,6 +108,21 @@ def signed(stack_available: bool, isolate_db):
         pass
 
 
+@pytest.fixture()
+def admin(stack_available: bool, isolate_db):
+    """An app session already logged in as the seeded admin."""
+    if not stack_available:
+        pytest.skip(f"automation stack not reachable. {STACK_HINT}")
+    app = SignalTrackerDsl()
+    app.launch()
+    app.login(cfg.ADMIN_USER, cfg.ADMIN_PASSWORD)
+    yield app
+    try:
+        app.quit()
+    finally:
+        pass
+
+
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
     """Attach a screenshot to every failing E2E step."""
