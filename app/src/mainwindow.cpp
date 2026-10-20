@@ -63,6 +63,14 @@ void repopulateCombo(QComboBox* combo, const QStringList& values)
 
 } // namespace
 
+// Display cap (owner decision 2026-10-20): only the first kMaxDisplayedRows
+// of a query land in the table widget. The status bar and the CSV export
+// keep reporting/writing the FULL query size, so the user still sees the
+// real data size; the small UIA tree keeps automation finds fast (probed:
+// the 10,080-row tree made every find cost ~11s, page_source 40s/6.9MB).
+// Pagination/load-more can build on this later.
+constexpr int kMaxDisplayedRows = 200;
+
 MainWindow::MainWindow(const QString& user, QWidget* parent)
     : QMainWindow(parent)
     , currentUser_(user)
@@ -294,11 +302,12 @@ void MainWindow::onSearch()
     const auto rows = Db::queryFilters(current(provinceCombo), current(cityCombo),
                                        current(technologyCombo), current(operatorCombo));
     signalTable->setRowCount(0);
-    for (const auto& row : rows) {
-        const int r = signalTable->rowCount();
-        signalTable->insertRow(r);
+    const int shown = qMin<int>(rows.size(), kMaxDisplayedRows);
+    for (int i = 0; i < shown; ++i) {
+        const auto& row = rows.at(i);
+        signalTable->insertRow(i);
         for (int c = 0; c < row.size() && c < signalTable->columnCount(); ++c)
-            signalTable->setItem(r, c, new QTableWidgetItem(row.at(c).toString()));
+            signalTable->setItem(i, c, new QTableWidgetItem(row.at(c).toString()));
     }
     statusBar()->showMessage(
         QStringLiteral("Showing %1 rows").arg(rows.size()));

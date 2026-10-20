@@ -26,6 +26,7 @@ class SmokeMain : public QObject {
 private slots:
     void signinDialogEnsuresDomainDb();
     void mandatoryIdentifiersPresent();
+    void tableDisplayCappedStatusReal();
     void chartShowsValueLabelsAndData();
     void signinGateBlocksMainWindow();
     void registerModeValidation();
@@ -122,6 +123,26 @@ void SmokeMain::mandatoryIdentifiersPresent()
         QCOMPARE(chart->axes(Qt::Vertical).size(), 1);
         const auto axesY = chart->axes(Qt::Vertical);
         QCOMPARE(axesY.first()->labelsFont().pointSize(), 9);
+    }
+}
+
+// Display cap contract (owner decision 2026-10-20): the widget shows only
+// the first 200 rows of the query, while the status bar keeps reporting
+// the FULL count and the CSV export writes the full query. The small UIA
+// tree keeps E2E finds fast; the user still sees the real size.
+void SmokeMain::tableDisplayCappedStatusReal()
+{
+    MainWindow w(QStringLiteral("admin"));
+    w.show();
+    QTest::qWait(50); // initial fill (ctor onSearch)
+    auto* table = w.findChild<QTableWidget*>(QString::fromLatin1("signalTable"));
+    QVERIFY(table != nullptr);
+    QCOMPARE(table->rowCount(), 200);
+
+    for (auto* bar : w.findChildren<QStatusBar*>()) {
+        const QString text = bar->currentMessage();
+        QVERIFY2(text == QStringLiteral("Showing 10080 rows"),
+                 qPrintable(QString("status bar says: %1").arg(text)));
     }
 }
 
