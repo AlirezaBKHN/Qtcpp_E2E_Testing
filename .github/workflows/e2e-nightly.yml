@@ -24,8 +24,10 @@ jobs:
     name: e2e (full suite, TC019 deselected)
     runs-on: windows-latest
     timeout-minutes: 30
-    env:
-      DRIVER_MODE: direct
+    # No DRIVER_MODE: the PRD-primary Appium path (default). Direct mode
+    # (WAD only) is broken with selenium 4 - WAD 1.2.1 parses legacy JSONWP
+    # caps, selenium sends the W3C envelope, so session creation 400s with
+    # "Bad capabilities" (probed on the runner, 2026-10-20/21).
     steps:
       - uses: actions/checkout@v4
 
@@ -76,11 +78,22 @@ jobs:
       # AFTER install-qt-action: its internal setup-python (>=3.14.0) has
       # already reshaped PATH, so python -m pip binds to the same
       # interpreter pytest will run under.
-      - name: Install test deps + Allure CLI
+      - name: Install test deps + Allure CLI + Appium stack
         shell: pwsh
         run: |
           python -m pip install -r automation\requirements.txt
-          npm install -g allure@3.21.0 # docs/env-setup.md pin (npm package "allure", v3)
+          npm install -g allure@3.21.0
+          npm install -g appium@3.8.0
+          appium driver install --source npm appium-windows-driver@6.3.1
+          # Appium 3 house-peering fix (docs/env-setup.md): the per-user
+          # ~/.appium/node_modules needs an 'appium' junction to the global
+          # npm package or the windows driver fails to load under Appium 3.
+          $appiumHome = Join-Path $env:USERPROFILE '.appium\node_modules'
+          New-Item -ItemType Directory -Force $appiumHome | Out-Null
+          $target = Join-Path (npm root -g) 'appium'
+          if (-not (Test-Path (Join-Path $appiumHome 'appium'))) {
+            New-Item -ItemType Junction -Path (Join-Path $appiumHome 'appium') -Target $target | Out-Null
+          }
 
       - name: Build + deploy Qt runtime
         shell: pwsh
@@ -97,20 +110,24 @@ jobs:
           $exe = "${env:ProgramFiles(x86)}\Windows Application Driver\WinAppDriver.exe"
           if (-not (Test-Path $exe)) { throw 'WinAppDriver.exe missing after MSI install' }
 
-      # The factory only starts WAD lazily inside attach(), but conftest's
-      # stack_available probes the port BEFORE the first launch - without
-      # this step every E2E test silently SKIPS (green job, zero tests).
-      - name: Start WinAppDriver on :4729
+      # The Appium windows driver spawns/manages WinAppDriver.exe itself per
+      # session; CI only has to provide the server (conftest's
+      # stack_available probes :4723 before the first launch).
+      - name: Start Appium on :4723
         shell: pwsh
         run: |
-          $exe = "${env:ProgramFiles(x86)}\Windows Application Driver\WinAppDriver.exe"
-          Start-Process -FilePath $exe -ArgumentList '4729'
+          $diag = Join-Path $env:GITHUB_WORKSPACE 'diagnostics'
+          New-Item -ItemType Directory -Force $diag | Out-Null
+          $appium = (Get-Command appium.cmd -ErrorAction SilentlyContinue).Source
+          if (-not $appium) { throw 'appium.cmd not on PATH after npm -g install' }
+          Start-Process -FilePath $appium -ArgumentList '--port', '4723' -RedirectStandardOutput "$diag\appium.log" -RedirectStandardError "$diag\appium-err.log"
           $ok = $false
-          for ($i = 0; $i -lt 30; $i++) {
-            try { $c = New-Object System.Net.Sockets.TcpClient('127.0.0.1', 4729); $c.Close(); $ok = $true; break }
+          for ($i = 0; $i -lt 90; $i++) {
+            try { $c = New-Object System.Net.Sockets.TcpClient('127.0.0.1', 4723); $c.Close(); $ok = $true; break }
             catch { Start-Sleep -Seconds 1 }
           }
-          if (-not $ok) { throw 'WinAppDriver never answered on 4729' }
+          if (-not $ok) { throw 'Appium never answered on 4723' }
+          Get-Content "$diag\appium.log" -Tail 5 -ErrorAction SilentlyContinue
 
       # Per-test fixture isolation (isolate_db) needs no pre-restore: it
       # restores + migrates the mapped fixture before EVERY test.
