@@ -20,9 +20,9 @@ net.chart().should_be_visible()
 
 ```text
 app/            Qt app (CMake, Widgets + Charts + Sql), smoke/db ctest targets
-database/       committed signaltracker.db (10080 deterministic rows over 7 days)
-automation/     pytest framework: config, locators, driver factory, DSL, page objects, tests/TC001-015
-docs/           test-cases/TC001-TC015.md, env-setup.md, superpowers/plans/
+database/       fixtures/ (committed .db fixtures - the data source of truth), migrations/, fixtures.json; signaltracker.db is a disposable working copy (git-ignored)
+automation/     pytest framework: config, locators, driver factory, DSL, page objects, tests/TC001-TC018
+docs/           test-cases/TC001-TC018.md, env-setup.md, superpowers/plans/
 scripts/        build / run / test / report PowerShell helpers (below)
 reports/        allure-results/ + allure-report/ (generated), export CSVs land in reports/export/
 ci/README.md    future CI/CD flow (documentation only)
@@ -112,16 +112,22 @@ quality trend, and the weakest-cells list. **Reports**: group summary with CSV e
 daily drill-down trend. **Users** (admin only): list registered users, remove non-admin
 accounts (removing `admin` is refused by the app).
 
-- Database: SQLite `signaltracker.db`, created + **seeded deterministically (fixed RNG seed,
-  10080 rows over 7 days, -120..-50 dBm)** on first launch if the table is missing; the seeded
-  file is also committed under `database/`.
+- Database: SQLite. **`database/fixtures/` holds the committed `.db` fixtures — the only
+  source of truth** (`seed_full.db`: the deterministic 10080-row/7-day dataset; `empty.db`:
+  schema + seeded users, zero cells). The app always opens `database/signaltracker.db`, a
+  **git-ignored working copy** that the test stack materializes per test: the mapped fixture
+  is restored (copied over) and migrated (`database/migrations/*.sql`, `PRAGMA
+  user_version`-gated) before EVERY test — never a stale db. Restore one manually with
+  `scripts\restore-fixture.ps1 [-Fixture <name>]`. If the working db is absent, the run
+  scripts restore the default fixture; the app's own first-launch self-seed remains only as
+  a safety net.
 - Every interactive control carries a **stable identifier** (`provinceCombo`, `searchButton`,
   `signalTable`, `signalChart`, …) set on both `objectName` and `accessibleName` — that's what
   automation locates (UIA `Name` strategy; see `automation/locators.py`). Read-only KPI/status
   readouts mirror their DISPLAYED text in `accessibleName` (the only readable surface WAD
   offers).
 
-## The 17 E2E tests
+## The 18 E2E tests
 
 `TC001` launch + register-first login · `TC002` province filter · `TC003` city filter
 (cascade, Fars→Shiraz) · `TC004` technology filter · `TC005` operator filter · `TC006`
@@ -131,7 +137,7 @@ combined filters · `TC007` reset · `TC008` refresh row-count equality · `TC00
 trend / weakest cells · `TC015` users admin (remove user, admin guard) · `TC016`
 pagination (page windows cross-checked against the CSV export, page-size selector) ·
 `TC017` row-id DSL (`should_contain_row` / `should_not_contain_row` over the realized ID
-column).
+column) · `TC018` empty fixture (sign-in works on 0 cells: `Page 1 of 1`, `Showing 0 rows`).
 Catalog with preconditions/steps/expected results: `docs/test-cases/`. Failures attach a
 screenshot to the Allure report.
 

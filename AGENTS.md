@@ -81,12 +81,19 @@ C++ toolchain paths are absolute defaults in `scripts/build.ps1` (overridable vi
 - **Readout contract:** read-only KPI/status readouts keep `objectName` = stable id but set
   `accessibleName` to the DISPLAYED text (`'49.8%'`, `'10080 cells'`, `'Showing N rows'`) —
   the only readable surface WAD offers. `app_smoke` pins it.
-- **Per-test DB isolation:** every E2E test runs under the `isolate_db` fixture (committed
-  `database/signaltracker.db` restored, `reports/export/*.csv` purged per test). The
-  committed DB must stay byte-clean across runs; if it is dirty: `taskkill /F /IM
-  IranSignalTracker.exe` FIRST (the app holds the file), then `git checkout --
-  database/signaltracker.db`. Register/remove tests rely on it — do not "clean up" data in
-  tests.
+- **Per-test DB isolation (fixture system, spec 2026-10-20):** `database/fixtures/` holds the
+  COMMITTED `.db` fixtures — the only source of truth; the fixtures' bytes must stay
+  byte-clean across runs (never open one read-write). `database/signaltracker.db` is a
+  git-ignored, DISPOSABLE working copy: every E2E test runs under `isolate_db`, which
+  restores AND migrates the test's mapped fixture (`database/fixtures.json`: nodeid override
+  or `default`) BEFORE the test — unconditionally, no restore-if-changed, no session reuse,
+  no teardown restore (owner directive C5). Purged per test: `reports/export/*.csv`. If the
+  working db is corrupt/absent, the next restore fixes it; the run scripts materialize the
+  default fixture when it's absent. `db_snapshot` no longer exists. Manual restore:
+  `scripts\restore-fixture.ps1 [-Fixture <name>]` (= `python automation\fixtures.py`).
+  Schema changes: add `database/migrations/<number>_<name>.sql` — applied to the working
+  copy only, `PRAGMA user_version`-gated. Register/remove tests rely on seed data — do not
+  "clean up" data in tests.
 - **Users tab is admin-gated:** the Users TabItem and its home card are mounted for admin
   sessions only (hidden pages are pruned from attached-session trees — `users()` raises
   unless the tab is mounted). Removing `admin` is refused app-side (guard pinned by smoke;
@@ -101,8 +108,11 @@ C++ toolchain paths are absolute defaults in `scripts/build.ps1` (overridable vi
   export mirrors. Pagination windows are defined against THIS order; don't change it
   without re-pinning TC016/TC017.
 - **Seeder determinism:** fixed `std::mt19937(20241019)`, 10080 rows over 7 days when the
-  `cells` table is absent. Changing seed values invalidates committed `database/signaltracker.db` — regenerate
-  via `app_dbgen` (`& app\build-mingw\app_dbgen.exe database\signaltracker.db`).
+  `cells` table is absent. Changing seed values invalidates the committed fixture
+  `database/fixtures/seed_full.db` — regenerate DELIBERATELY (era depends on today's date;
+  review the diff before committing) via `& app\build-mingw\app_dbgen.exe
+  database\fixtures\seed_full.db`, then rebuild `database/fixtures/empty.db` the same way
+  (copy + `DELETE FROM cells` + `VACUUM`).
 - **Chart axes are persistent** (created once in `MainWindow` ctor); `refreshChart()` replaces
   only series/categories and **sets categories BEFORE attaching** — an attached category axis
   synced to a series with no categories auto-generates "1..n" placeholder slots. Bars encode a
