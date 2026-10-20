@@ -25,3 +25,6 @@ latex/
 smoke_users_scratch.db
 smoke_pager_scratch.db
 dbtest_cell.db
+# Fixture system (spec 2026-10-20): the working db is disposable - the
+# fixtures in database/fixtures/ are the only source of truth.
+database/signaltracker.db
