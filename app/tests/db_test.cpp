@@ -431,13 +431,47 @@ int main(int argc, char* argv[])
 
         // dailyQuality honors the date range (half-open right side unbounded).
         {
-            const auto half = Db::dailyQuality(QString(), QString(), mid.addDays(1), QDate());
+            const auto half = Db::dailyQuality(QString(), QString(), QString(),
+                                               QString(), QString(), QString(),
+                                               mid.addDays(1), QDate());
             CHECK(half.size() == 3); // day indices 4..6 of the 7-day era
             for (const auto& point : half)
                 CHECK(point.first >= mid.addDays(1).toString(Qt::ISODate));
-            const auto out = Db::dailyQuality(QString(), QString(),
+            const auto out = Db::dailyQuality(QString(), QString(), QString(),
+                                              QString(), QString(), QString(),
                                               QDate(2020, 1, 1), QDate(2020, 1, 2));
             CHECK(out.isEmpty());
+        }
+
+        // dailyQuality honors the COLUMN filters too (review finding: the
+        // dashboard trend and the reports drill must reflect the tab's
+        // full filter state, not only its dates). Value-level cross-check
+        // against straight SQL: a count-only oracle is masked by the seed
+        // (every province samples every day).
+        {
+            const auto fars = Db::dailyQuality(QString(), QString(),
+                                               QStringLiteral("Fars"), QString(),
+                                               QString(), QString(),
+                                               QDate(), QDate());
+            CHECK(fars.size() == 7);
+            QSqlQuery q(QSqlDatabase::database());
+            q.prepare("SELECT substr(sample_time,1,10) AS day, AVG(signal_strength)"
+                      " FROM cells WHERE province = 'Fars' GROUP BY day ORDER BY day");
+            q.exec();
+            int i = 0;
+            while (q.next() && i < fars.size()) {
+                CHECK(q.value(0).toString() == fars.at(i).first);
+                const double expected = (q.value(1).toDouble() + 120.0) / 0.7;
+                CHECK(qAbs(expected - fars.at(i).second) < 1e-9);
+                ++i;
+            }
+            CHECK(i == 7 && !q.next());
+            // Combined column + date filter.
+            const auto farsHalf =
+                Db::dailyQuality(QString(), QString(), QStringLiteral("Fars"),
+                                 QString(), QString(), QString(),
+                                 mid.addDays(1), QDate());
+            CHECK(farsHalf.size() == 3);
         }
     }
 

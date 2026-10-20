@@ -324,6 +324,9 @@ int Db::cellCount(const QDate& from, const QDate& to)
 
 QVector<LabelAvg> Db::dailyQuality(const QString& groupColumn,
                                   const QString& groupValue,
+                                  const QString& province, const QString& city,
+                                  const QString& technology,
+                                  const QString& operatorName,
                                   const QDate& from, const QDate& to)
 {
     QVector<LabelAvg> points;
@@ -345,6 +348,14 @@ QVector<LabelAvg> Db::dailyQuality(const QString& groupColumn,
     QStringList clauses;
     if (filtered)
         clauses << QStringLiteral("%1 = :v").arg(groupColumn);
+    if (!province.isEmpty() && province != QLatin1String("All"))
+        clauses << "province = :province";
+    if (!city.isEmpty() && city != QLatin1String("All"))
+        clauses << "city = :city";
+    if (!technology.isEmpty() && technology != QLatin1String("All"))
+        clauses << "technology = :technology";
+    if (!operatorName.isEmpty() && operatorName != QLatin1String("All"))
+        clauses << "operator = :operator";
     appendDateClause(from, to, clauses);
     if (!clauses.isEmpty())
         sql += QStringLiteral(" WHERE ") + clauses.join(QStringLiteral(" AND "));
@@ -354,6 +365,14 @@ QVector<LabelAvg> Db::dailyQuality(const QString& groupColumn,
     q.prepare(sql);
     if (filtered)
         q.bindValue(":v", groupValue);
+    if (clauses.contains("province = :province"))
+        q.bindValue(":province", province);
+    if (clauses.contains("city = :city"))
+        q.bindValue(":city", city);
+    if (clauses.contains("technology = :technology"))
+        q.bindValue(":technology", technology);
+    if (clauses.contains("operator = :operator"))
+        q.bindValue(":operator", operatorName);
     bindDates(q, from, to);
     q.exec();
     while (q.next())

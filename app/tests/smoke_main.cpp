@@ -715,7 +715,12 @@ void SmokeMain::dashboardContract()
     auto* trendCaption = admin.findChild<QLabel*>(QString::fromLatin1("trendCaption"));
     QVERIFY(trendCaption);
     {
-        const auto trend = Db::dailyQuality(QStringLiteral("province"), QStringLiteral("Fars"));
+        // The app's trend oracle: date + column filters (the app passes
+        // the widget state; the caption alone can't detect value drift).
+        const auto trend = Db::dailyQuality(QString(), QString(),
+                                            QStringLiteral("Fars"),
+                                            QString(), QString(), QString(),
+                                            era.first, era.second);
         QVERIFY(trend.size() >= 1 && trend.size() <= 7);
         QCOMPARE(trendCaption->text(),
                  QStringLiteral("Daily quality trend - %1 points").arg(trend.size()));

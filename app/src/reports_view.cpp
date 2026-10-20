@@ -331,7 +331,11 @@ void ReportsView::refreshDrill(int currentRow)
         const QString column = groupColumnForGroupText(reportGroupBy->currentText());
         const QString label = reportTable->item(currentRow, 0)->text();
         const auto f = currentFilters();
-        const auto trend = Db::dailyQuality(column, label, f.from, f.to);
+        // The drill reflects the tab's FULL filter state: the selected
+        // label drills within the other column filters too.
+        const auto trend = Db::dailyQuality(column, label, f.province, f.city,
+                                            f.technology, f.operatorName,
+                                            f.from, f.to);
         for (const auto& point : trend) {
             const QDateTime day = QDateTime::fromString(point.first, Qt::ISODate);
             series->append(day.toMSecsSinceEpoch(), point.second);

@@ -89,9 +89,15 @@ public:
     // (YYYY-MM-DD, quality) pairs ascending; groupColumn must be one of
     // province/operator/technology and groupValue filters that column -
     // empty groupValue = the whole network. Always exactly 7 buckets on the
-    // seeded era (Task 2). Date bounds as in queryFilters.
+    // seeded era (Task 2). Date bounds as in queryFilters; the four column
+    // filters reach the daily aggregate too (the dashboard trend and the
+    // reports drill reflect the tab's FULL filter state).
     static QVector<LabelAvg> dailyQuality(const QString& groupColumn,
                                          const QString& groupValue,
+                                         const QString& province = {},
+                                         const QString& city = {},
+                                         const QString& technology = {},
+                                         const QString& operatorName = {},
                                          const QDate& from = {},
                                          const QDate& to = {});
     // Weakest rows first (strength < -102.5 dBm = quality below 25%),

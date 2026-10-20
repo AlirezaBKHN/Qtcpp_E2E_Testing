@@ -333,7 +333,8 @@ void DashboardView::refresh()
 
     auto* chart = trendChart->chart();
     chart->removeAllSeries();
-    const auto trend = Db::dailyQuality(QString(), QString(), from, to);
+    const auto trend = Db::dailyQuality(QString(), QString(), province, city,
+                                       technology, operatorName, from, to);
     trendCaption->setText(tr("Daily quality trend - %1 points").arg(trend.size()));
     auto* series = new QLineSeries;
     for (const auto& point : trend) {
