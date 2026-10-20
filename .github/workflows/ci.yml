@@ -1,0 +1,81 @@
+# Native CI tier (design 2026-10-21): PRs to main -> build + ctest gate.
+#
+# Zero changes to repo scripts: the toolchain is wired through build.ps1's
+# IST_* env overrides (scripts/build.ps1), and ctest is invoked directly
+# because scripts/run-ctest.ps1 hardcodes C:\Qt paths that don't exist on a
+# hosted runner. Fixture restore mirrors what run-ctest.ps1 does (line 11).
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: native (app_smoke + app_dbtest)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install CMake 3.30.5 + Ninja
+        uses: lukka/get-cmake@v4
+        with:
+          cmakeVersion: '3.30.5' # docs/env-setup.md pin
+
+      # qtcharts is an add-on module (NOT in qtbase) - the chart pane links
+      # Qt6::Charts, so the build fails without it. tools_mingw1310 installs
+      # Qt's MinGW 13.1.0 toolchain (same version as the dev machine).
+      - name: Install Qt 6.8.3 (win64_mingw) + MinGW toolchain
+        uses: jurplegal/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: win64_mingw
+          dir: 'C:\Qt'
+          modules: 'qtcharts'
+          tools: 'tools_mingw1310'
+          cache: true
+
+      # Tool dir names under C:\Qt\Tools can vary with the aqt layout, so
+      # resolve gcc/g++ by glob instead of hardcoding, then publish IST_*
+      # for scripts/build.ps1 (which has no auto-detection fallback).
+      - name: Wire IST_* tool paths
+        shell: pwsh
+        run: |
+          $gxx = (Get-ChildItem 'C:\Qt\Tools\mingw*\bin\g++.exe' |
+                  Select-Object -First 1).FullName
+          if (-not $gxx) { throw 'MinGW g++ not found under C:\Qt\Tools\mingw*' }
+          Add-Content $env:GITHUB_ENV "IST_QT_BIN=C:\Qt\6.8.3\mingw_64\bin"
+          Add-Content $env:GITHUB_ENV "IST_GCC=$(Join-Path (Split-Path $gxx -Parent) 'gcc.exe')"
+          Add-Content $env:GITHUB_ENV "IST_GXX=$gxx"
+          Add-Content $env:GITHUB_ENV "IST_CMAKE=$((Get-Command cmake.exe).Source)"
+          Add-Content $env:GITHUB_ENV "IST_NINJA=$((Get-Command ninja.exe).Source)"
+
+      # Also handles windeployqt --compiler-runtime + the Qt6Test.dll copy
+      # (both mandatory: WinAppDriver/test exes run without a developer PATH).
+      - name: Build + deploy Qt runtime
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File scripts\build.ps1
+
+      - name: ctest (app_smoke + app_dbtest)
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File scripts\restore-fixture.ps1
+          $env:PATH = "C:\Qt\6.8.3\mingw_64\bin;$(Split-Path $env:IST_GXX -Parent);$env:PATH"
+          ctest --test-dir app\build-mingw --output-on-failure
+
+      - name: Upload ctest log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-log
+          path: app/build-mingw/Testing/Temporary/LastTest.log
+          retention-days: 14
+          if-no-files-found: ignore
