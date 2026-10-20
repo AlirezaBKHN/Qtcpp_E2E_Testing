@@ -150,6 +150,53 @@ int main(int argc, char* argv[])
         QFile::remove(path);
     }
 
+    // 9. users table: seeded credentials + auth/register/remove/list APIs.
+    {
+        // Seeded users exist and are sorted.
+        const QStringList names = Db::usernames();
+        CHECK(names.size() == 3);
+        CHECK(names.at(0) <= names.at(1) && names.at(1) <= names.at(2));
+        CHECK(names.contains("admin"));
+        CHECK(names.contains("guest"));
+        CHECK(names.contains("e2e_user"));
+
+        // Seeded credentials authenticate.
+        CHECK(Db::authUser("admin", "admin"));
+        CHECK(Db::authUser("guest", "guest"));
+        CHECK(Db::authUser("e2e_user", "e2e123"));
+
+        // Wrong password / unknown username fail on exact match.
+        CHECK(!Db::authUser("admin", "wrong"));
+        CHECK(!Db::authUser("nobody", "admin"));
+        CHECK(Db::authUser("Admin", "admin") == false); // case-sensitive username
+        CHECK(Db::authUser("admin", "Admin") == false); // case-sensitive password
+
+        // registerUser: duplicate username (case-sensitive exact match) rejected.
+        CHECK(!Db::registerUser("admin", "anything"));
+        // Empty username / empty password rejected, no mutation.
+        CHECK(!Db::registerUser("", "pw"));
+        CHECK(!Db::registerUser("tempuser", ""));
+        CHECK(!Db::usernames().contains("tempuser"));
+
+        // registerUser success + sorted insertion.
+        CHECK(Db::registerUser("tempuser", "temppw"));
+        CHECK(Db::authUser("tempuser", "temppw"));
+        {
+            const QStringList after = Db::usernames();
+            CHECK(after.size() == 4);
+            CHECK(after.at(0) <= after.at(1) && after.at(1) <= after.at(2) &&
+                  after.at(2) <= after.at(3));
+        }
+        CHECK(!Db::registerUser("tempuser", "other")); // duplicate
+
+        // removeUser: admin protected, unknown rejected, real user removed.
+        CHECK(!Db::removeUser("admin"));
+        CHECK(!Db::removeUser("NoSuchUser"));
+        CHECK(Db::removeUser("tempuser"));
+        CHECK(!Db::usernames().contains("tempuser"));
+        CHECK(!Db::authUser("tempuser", "temppw"));
+    }
+
     QFile::remove(QString::fromLatin1(kDbPath));
     if (failures > 0) {
         fprintf(stderr, "db_test: %d failure(s)\n", failures);

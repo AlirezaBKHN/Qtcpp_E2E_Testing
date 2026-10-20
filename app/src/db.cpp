@@ -55,6 +55,26 @@ bool tableExists(const QSqlDatabase& db)
     return q.next();
 }
 
+// Seeded demo accounts (owner-confirmed credentials, plaintext, no roles).
+const struct {
+    const char* username;
+    const char* password;
+} kSeedUsers[] = {
+    {"admin", "admin"},
+    {"guest", "guest"},
+    {"e2e_user", "e2e123"},
+};
+
+QStringList sortedUsernames()
+{
+    QStringList names;
+    QSqlQuery q("SELECT username FROM users");
+    while (q.next())
+        names << q.value(0).toString();
+    names.sort();
+    return names;
+}
+
 void seed(QSqlDatabase& db)
 {
     std::mt19937 rng(kFixedSeed);
@@ -126,7 +146,66 @@ bool Db::init(const QString& dbPath)
             return false;
         seed(db);
     }
+
+    if (!QSqlQuery(db).exec("CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY,"
+                            " password TEXT NOT NULL)"))
+        return false;
+    for (const auto& account : kSeedUsers) {
+        // INSERT OR IGNORE: re-init on an existing DB must not duplicate rows.
+        QSqlQuery insertQ(db);
+        insertQ.prepare("INSERT OR IGNORE INTO users (username, password)"
+                        " VALUES (?, ?)");
+        insertQ.addBindValue(QString::fromLatin1(account.username));
+        insertQ.addBindValue(QString::fromLatin1(account.password));
+        if (!insertQ.exec())
+            return false;
+    }
     return true;
+}
+
+QStringList Db::usernames()
+{
+    return sortedUsernames();
+}
+
+bool Db::registerUser(const QString& username, const QString& password)
+{
+    if (username.isEmpty() || password.isEmpty())
+        return false;
+    // TEXT PRIMARY KEY is binary-compared in SQLite: case-sensitive exact match.
+    if (usernames().contains(username))
+        return false;
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isValid())
+        return false;
+    QSqlQuery insertQ(db);
+    insertQ.prepare("INSERT INTO users (username, password) VALUES (?, ?)");
+    insertQ.addBindValue(username);
+    insertQ.addBindValue(password);
+    return insertQ.exec();
+}
+
+bool Db::authUser(const QString& username, const QString& password)
+{
+    if (username.isEmpty() || password.isEmpty())
+        return false;
+    QSqlQuery q(QSqlDatabase::database());
+    q.prepare("SELECT COUNT(*) FROM users WHERE username = :u AND password = :p");
+    q.bindValue(":u", username);
+    q.bindValue(":p", password);
+    q.exec();
+    return q.next() && q.value(0).toInt() > 0;
+}
+
+bool Db::removeUser(const QString& username)
+{
+    if (username == QLatin1String("admin"))
+        return false; // self-delete guard: admin is never removable
+    QSqlQuery q(QSqlDatabase::database());
+    q.prepare("DELETE FROM users WHERE username = :u");
+    q.bindValue(":u", username);
+    q.exec();
+    return q.numRowsAffected() > 0;
 }
 
 FilterBindings Db::queryFilters(const QString& province, const QString& city,

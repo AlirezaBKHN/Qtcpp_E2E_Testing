@@ -36,4 +36,13 @@ public:
     static bool writeExportCsv(const QString& path, const QString& province,
                                const QString& city, const QString& technology,
                                const QString& operatorName);
+
+    // Auth layer (plaintext demo-grade; owner ruling). usernames() is the
+    // sorted user list. Registration requires a non-empty username not
+    // already present (case-sensitive exact match) and a non-empty password.
+    static QStringList usernames();
+    static bool registerUser(const QString& username, const QString& password);
+    static bool authUser(const QString& username, const QString& password);
+    // The literal 'admin' account can never be removed; unknown users fail too.
+    static bool removeUser(const QString& username);
 };
