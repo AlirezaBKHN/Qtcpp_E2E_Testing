@@ -7,12 +7,17 @@
 \usepackage{ptext}
 \usepackage{algorithm}
 \usepackage{algorithmic}
+% گزینه‌های xcolor باید پیش از tikz و قالب با مجموعه‌ی کامل بارگذاری شوند
+% تا همOption-clash رخ ندهد و هم استایل سرصفحه‌های قالب سالم بماند
+\usepackage[dvipsnames,table,svgnames]{xcolor}
 \usepackage{listings}
 \usepackage{media9}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
 \usepackage{tabularx}
 \usepackage{float}
 
-% قالب بستان؛ بارگذاری بسته‌ها و تنظیمات آن (شامل xcolor با گزینه‌هایش)
+% قالب بستان
 \input{\MyPath Boostan-Thesis}
 
 % رنگ و تنظیمات کد پس از بارگذاری قالب
@@ -41,7 +46,8 @@
 
 \title{طراحی و پیاده‌سازی چارچوب تست \lr{E2E} برای نرم‌افزارهای مبتنی بر \lr{Qt C++}}
 \faculity{دانشکده مهندسی کامپیوتر}
-\group{نام گروه}
+% بدون گروه — نگه‌دارنده‌ی نامرئی تا فاصله‌گذاری صفحه‌ی عنوان سالم بماند
+\group{\mbox{}}
 \author{علیرضا بیات خانی}
 \authorCode{99521136}
 \forwhat{پایان‌نامه کارشناسی}
