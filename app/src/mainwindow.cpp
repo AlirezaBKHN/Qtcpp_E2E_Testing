@@ -1,5 +1,6 @@
 #include "dashboard_view.h"
 #include "mainwindow.h"
+#include "reports_view.h"
 #include "users_view.h"
 
 #include <QtCharts/QBarCategoryAxis>
@@ -183,10 +184,11 @@ MainWindow::MainWindow(const QString& user, QWidget* parent)
 
     // Dashboard/Reports arrive in Tasks 5/6; placeholders pin the tab order
     // now (replaced in place, never reordered).
-    // Home page + real dashboard (reports placeholder stays until Task 6).
+    // Home page + real dashboard and reports views.
     QWidget* homePage = makeStable(new QWidget(this), "homeTab");
     QWidget* dashboardPage = new DashboardView(this);
-    QWidget* reportsPage = makeStable(new QWidget(this), "reportsTab");
+    auto* reportsView = new ReportsView(this);
+    QWidget* reportsPage = reportsView;
 
     // -- Home: routing cards.
     auto* cardsRow = new QHBoxLayout;
@@ -244,6 +246,10 @@ MainWindow::MainWindow(const QString& user, QWidget* parent)
     connect(refreshButton, &QPushButton::clicked, this, &MainWindow::onRefresh);
     connect(resetButton, &QPushButton::clicked, this, &MainWindow::onReset);
     connect(exportButton, &QPushButton::clicked, this, &MainWindow::onExport);
+    connect(reportsView, &ReportsView::exported, this, [this](const QString& path, bool ok) {
+        statusBar()->showMessage(ok ? QStringLiteral("Exported: ") + path
+                                    : QStringLiteral("Export failed"));
+    });
     connect(provinceCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &MainWindow::onProvinceChanged);
     connect(chartGroupBy, QOverload<int>::of(&QComboBox::currentIndexChanged),

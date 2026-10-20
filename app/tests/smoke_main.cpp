@@ -31,6 +31,7 @@ private slots:
     void tabsAndHomeCards();
     void usersViewAdminOnly();
     void dashboardContract();
+    void reportsContract();
 };
 
 static const char* kIds[] = {
@@ -318,6 +319,76 @@ void SmokeMain::dashboardContract()
     QVERIFY(worstList);
     QCOMPARE(worstList->rowCount(), 8);
     QVERIFY(worstList->rowCount() >= 1);
+}
+
+// Reports: group summary table + per-label drill-down + CSV export.
+void SmokeMain::reportsContract()
+{
+    MainWindow admin(QString::fromLatin1("admin"));
+    admin.show();
+    admin.findChild<QPushButton*>(QString::fromLatin1("homeCardReports"))->click();
+    QTest::qWait(30);
+
+    auto* groupBy = admin.findChild<QComboBox*>(QString::fromLatin1("reportGroupBy"));
+    QVERIFY(groupBy);
+    QCOMPARE(groupBy->currentText(), QStringLiteral("Province"));
+
+    auto* table = admin.findChild<QTableWidget*>(QString::fromLatin1("reportTable"));
+    QVERIFY(table);
+    QCOMPARE(table->columnCount(), 3);
+    // One row per province, labels label-ascending (the sortable table's
+    // ruling), positive row counts.
+    QStringList provinces = Db::provinces();
+    provinces.sort();
+    QCOMPARE(table->rowCount(), Db::provinces().size());
+    const int rowCount = table->rowCount();
+    for (int r = 0; r < rowCount; ++r) {
+        QCOMPARE(table->item(r, 0)->text(), provinces.at(r));
+        QVERIFY(table->item(r, 1)->text().toInt() > 0);
+        QVERIFY(!table->item(r, 2)->text().isEmpty());
+    }
+
+    // Drill-down: selecting a row makes the trend chart show that label's
+    // per-day quality - exactly the 7 seeded buckets.
+    auto* chartView = admin.findChild<QChartView*>(QString::fromLatin1("dailyTrendChart"));
+    QVERIFY(chartView);
+    auto* chart = chartView->chart();
+    QCOMPARE(chart->series().size(), 1);
+    QCOMPARE(chart->axes(Qt::Horizontal).size(), 1);
+    QCOMPARE(chart->axes(Qt::Vertical).size(), 1);
+    table->selectRow(0);
+    QTest::qWait(30);
+    auto* series = qobject_cast<QLineSeries*>(chart->series().first());
+    QVERIFY(series != nullptr);
+    QCOMPARE(series->count(), 7);
+    QTest::qWait(10);
+
+    // Export: silent writer into reports/export/report_*.csv with a header.
+    const QDir exportDir(QDir(QCoreApplication::applicationDirPath())
+                             .absoluteFilePath(QStringLiteral("../../reports/export")));
+    if (exportDir.exists())
+        for (const QFileInfo& f : exportDir.entryInfoList({"report_*.csv"}))
+            QFile::remove(f.absoluteFilePath());
+    auto* exportButton =
+        admin.findChild<QPushButton*>(QString::fromLatin1("exportReportButton"));
+    QVERIFY(exportButton);
+    exportButton->click();
+    QTest::qWait(50);
+    const QStringList written =
+        exportDir.entryList({"report_*.csv"}, QDir::Files);
+    QCOMPARE(written.size(), 1);
+    QFile out(exportDir.absoluteFilePath(written.first()));
+    QVERIFY(out.open(QIODevice::ReadOnly | QIODevice::Text));
+    QTextStream in(&out);
+    QCOMPARE(in.readLine(), QStringLiteral("label,rows,avg_quality"));
+    out.close();
+    // Status bar confirms with the conventional copy.
+    bool confirmed = false;
+    for (auto* bar : admin.findChildren<QStatusBar*>()) {
+        if (bar->currentMessage().startsWith(QStringLiteral("Exported: ")))
+            confirmed = true;
+    }
+    QVERIFY(confirmed);
 }
 
 // The chart must be readable as data, not just a graphic: per-bar value

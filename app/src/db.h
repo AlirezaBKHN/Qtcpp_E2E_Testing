@@ -25,7 +25,8 @@ public:
                                        const QString& technology,
                                        const QString& operatorName);
 
-    // (label, avg(signal_strength)) series for the chart.
+    // (label, avg(signal_strength)) series for the chart. The group column
+    // is whitelisted (province/operator/technology); empty filter args are no-op.
     static QVector<LabelAvg> avgBy(const QString& groupColumn, const QString& province,
                                    const QString& city, const QString& technology,
                                    const QString& operatorName);

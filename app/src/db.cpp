@@ -338,7 +338,9 @@ QVector<LabelAvg> Db::avgBy(const QString& groupColumn, const QString& province,
                             const QString& city, const QString& technology,
                             const QString& operatorName)
 {    QVector<LabelAvg> points;
-    if (groupColumn != QLatin1String("operator") && groupColumn != QLatin1String("technology"))
+    if (groupColumn != QLatin1String("operator")
+        && groupColumn != QLatin1String("technology")
+        && groupColumn != QLatin1String("province"))
         return points;
 
     QSqlDatabase db = QSqlDatabase::database();
