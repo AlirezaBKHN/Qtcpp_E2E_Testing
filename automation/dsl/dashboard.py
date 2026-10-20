@@ -21,3 +21,12 @@ class DashboardDsl:
     def worst_cells_rows(self) -> int:
         """Row count from the 'Weakest cells - N rows' caption."""
         return self._view.weakest_rows()
+
+    # -- filter section (spec 2026-10-20) --------------------------------
+    def from_date_text(self) -> str:
+        """The dashboard from-date readout's displayed text."""
+        return self._view.from_date_text()
+
+    def to_date_text(self) -> str:
+        """The dashboard to-date readout's displayed text."""
+        return self._view.to_date_text()

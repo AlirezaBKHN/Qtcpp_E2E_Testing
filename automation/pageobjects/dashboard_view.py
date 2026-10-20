@@ -6,7 +6,9 @@ driver through the resolve_element seam; the DSL only delegates).
 from __future__ import annotations
 
 import re
+import time
 
+from drivers import keyboard
 from pageobjects.main_page import MainPage
 from pageobjects.resolve_element import find, read_text
 
@@ -59,3 +61,27 @@ class DashboardView:
         """
         return _caption_number(self._driver, "Weakest cells", r"(\d+)\s*rows",
                                "no 'Weakest cells - N rows' caption found")
+
+    # -- filter section (spec 2026-10-20) --------------------------------
+    def set_date(self, control: str, date: str) -> None:
+        """Set a QDateEdit (YYYY-MM-DD) via WAD element-targeted send_keys.
+
+        Pinned recipe (fresh-state probe, tools/probe_date_fresh.py E1):
+        WAD send_keys UIA-focuses the element, focus lands on the YEAR
+        section, and the 8 digits auto-advance year -> month -> day.
+        OS-level keybd_event digits DO NOT land (probe E3: value unchanged)
+        and are not used. The 'send_keys APPENDS' WAD quirk does not apply
+        to section-typed date edits, but the recipe assumes the edit
+        carries no in-progress typing state (fresh app or after Reset).
+        """
+        el = find(self._driver, control)
+        el.send_keys(date.replace("-", ""))
+        time.sleep(0.3)              # date-changed settle
+
+    def from_date_text(self) -> str:
+        """The from-date readout's displayed text ('YYYY-MM-DD')."""
+        return read_text(find(self._driver, "dashboardFromDateEdit"))
+
+    def to_date_text(self) -> str:
+        """The to-date readout's displayed text ('YYYY-MM-DD')."""
+        return read_text(find(self._driver, "dashboardToDateEdit"))

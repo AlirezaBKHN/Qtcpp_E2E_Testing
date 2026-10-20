@@ -65,6 +65,8 @@ def find(driver, control: str):
 
 def _scoped_xpaths(control: str) -> list[str]:
     """Relative-XPath candidates for a scoped (section-subtree) lookup."""
+    if control in locators.SPINNER_IDS:
+        return [f".//Spinner[contains(@AutomationId,'{control}')]"]
     if control in READOUT_IDS:
         return [f".//Edit[contains(@AutomationId,'{control}')]"]
     return [f".//*[@Name='{control}']"]

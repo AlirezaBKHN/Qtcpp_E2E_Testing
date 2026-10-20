@@ -28,10 +28,21 @@ import config as C
 # name match kept as a legacy fallback.
 XPATH_BY_AID = "//Edit[contains(@AutomationId,'%s')]"
 
+# Date-filter readouts (spec 2026-10-20, probed via probe_dump_dashboard):
+# QDateEdit presents to WAD as a UIA Spinner whose Name mirrors the
+# displayed YYYY-MM-DD text - the Edit-based readout XPath misses.
+XPATH_BY_AID_SPINNER = "//Spinner[contains(@AutomationId,'%s')]"
+
 READOUT_IDS = (
     "signinStatus", "registerStatus", "currentUserLabel",
     "kpiAvgQuality", "kpiCells", "kpiBestOperator", "kpiWorstOperator",
     "pageLabel",  # pager readout, "Page k of n" (spec 2026-10-20)
+)
+
+# Spinner-backed readouts (QDateEdit): see XPATH_BY_AID_SPINNER above.
+SPINNER_IDS = (
+    "dashboardFromDateEdit", "dashboardToDateEdit",
+    "reportsFromDateEdit", "reportsToDateEdit",
 )
 
 CONTROLS: dict[str, list[tuple[str, str]]] = {}
@@ -61,10 +72,25 @@ for _key in (
     "filterSection", "headerSection",
     # Pager (spec 2026-10-20): section + controls; pageLabel is a READOUT.
     "pagerSection", "pageSizeCombo", "prevPageButton", "nextPageButton",
+    # Dashboard/Reports filter sections + share charts/lists
+    # (spec 2026-10-20). Captions are NOT here: their UIA Name is the
+    # DISPLAYED TEXT (read via text-contains XPath, like trendCaption).
+    "dashboardFilterSection", "dashboardProvinceCombo", "dashboardCityCombo",
+    "dashboardTechnologyCombo", "dashboardOperatorCombo",
+    "dashboardSearchButton", "dashboardResetButton",
+    "operatorShareChart", "operatorShareList",
+    "techQualityChart", "techQualityList",
+    "reportsFilterSection", "reportsProvinceCombo", "reportsCityCombo",
+    "reportsTechnologyCombo", "reportsOperatorCombo",
+    "reportsSearchButton", "reportsResetButton",
+    "groupShareChart", "groupShareList",
 ):
     CONTROLS[_key] = [(C.BY_NAME, _key), (C.BY_ID, _key)]
 for _key in READOUT_IDS:
     CONTROLS[_key] = [(C.BY_XPATH, XPATH_BY_AID % _key),
+                      (C.BY_NAME, _key), (C.BY_ID, _key)]
+for _key in SPINNER_IDS:
+    CONTROLS[_key] = [(C.BY_XPATH, XPATH_BY_AID_SPINNER % _key),
                       (C.BY_NAME, _key), (C.BY_ID, _key)]
 
 # Status-bar readout ('Showing N rows'): its Name mirrors the live text, so
