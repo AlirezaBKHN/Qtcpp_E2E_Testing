@@ -58,3 +58,7 @@ class ReportsView:
 
     def list_items(self, control: str) -> list[str]:
         return ReadoutList(self._driver, control).items()
+
+    def drill_chart_visible(self) -> bool:
+        """The drill-down trend chart is displayed (TC010-style check)."""
+        return find(self._driver, "dailyTrendChart").is_displayed()
