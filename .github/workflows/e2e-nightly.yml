@@ -43,12 +43,12 @@ jobs:
           npm install -g allure@3.21.0 # docs/env-setup.md pin (npm package "allure", v3)
 
       - name: Install CMake 3.30.5 + Ninja
-        uses: lukka/get-cmake@v4
+        uses: lukka/get-cmake@v4.4.4
         with:
           cmakeVersion: '3.30.5'
 
       - name: Install Qt 6.8.3 (win64_mingw) + MinGW toolchain
-        uses: jurplegal/install-qt-action@v4
+        uses: jurplel/install-qt-action@v4.4.1
         with:
           version: '6.8.3'
           arch: win64_mingw
