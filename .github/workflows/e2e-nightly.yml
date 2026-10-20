@@ -120,14 +120,18 @@ jobs:
           New-Item -ItemType Directory -Force $diag | Out-Null
           $appium = (Get-Command appium.cmd -ErrorAction SilentlyContinue).Source
           if (-not $appium) { throw 'appium.cmd not on PATH after npm -g install' }
-          Start-Process -FilePath $appium -ArgumentList '--port', '4723' -RedirectStandardOutput "$diag\appium.log" -RedirectStandardError "$diag\appium-err.log"
+          # Plain Start-Process = fresh console with its OWN stdin. Do NOT
+          # -RedirectStandardOutput/-Error here: the child then inherits the
+          # step's stdin, which EOFs when this step exits - and Appium exits
+          # on stdin close (observed: server dead before pytest, while WAD
+          # started the same way as a plain console survives across steps).
+          Start-Process -FilePath $appium -ArgumentList '--port', '4723', '--log', "$diag\appium.log"
           $ok = $false
           for ($i = 0; $i -lt 90; $i++) {
             try { $c = New-Object System.Net.Sockets.TcpClient('127.0.0.1', 4723); $c.Close(); $ok = $true; break }
             catch { Start-Sleep -Seconds 1 }
           }
           if (-not $ok) { throw 'Appium never answered on 4723' }
-          Get-Content "$diag\appium.log" -Tail 5 -ErrorAction SilentlyContinue
 
       # Per-test fixture isolation (isolate_db) needs no pre-restore: it
       # restores + migrates the mapped fixture before EVERY test.
