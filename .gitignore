@@ -3,6 +3,7 @@ build*/
 
 # Test & report artifacts (tracked: reports/export/.gitkeep, committed DB)
 reports/runs/
+reports/.server-port
 reports/export/*.csv
 *.db-journal
 

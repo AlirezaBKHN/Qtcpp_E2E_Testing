@@ -42,7 +42,10 @@ if (-not $ok) {
     throw "allure generate kept failing after 3 attempts - check the newest log under $env:USERPROFILE\.allure\logs"
 }
 if ($Serve) {
-    & allure open "$report"
+    # Serve the repo root once on 127.0.0.1:2222 and open THIS report there
+    # (allure open would serve a single report on a random port instead).
+    $rel = $report.Substring($repo.Length).Replace('\', '/').TrimStart('/')
+    & (Join-Path $PSScriptRoot 'serve-reports.ps1') -Open "$rel/index.html"
 } else {
     Write-Host "Report ready: $(Join-Path $report 'index.html') (run: $(Split-Path $runDir -Leaf))"
 }

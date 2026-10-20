@@ -71,7 +71,7 @@ $env:DRIVER_MODE = 'direct'    # fallback: talk to WinAppDriver on :4729 without
 # 5) Tests: pick a suite interactively (automation\suites.json) or -Suite all
 powershell -ExecutionPolicy Bypass -File scripts\run-tests.ps1
 
-# 6) Allure report (newest run without one; -Run <name> for an older one)
+# 6) Allure report: newest run without one, served over HTTP and opened in the browser
 powershell -ExecutionPolicy Bypass -File scripts\run-allure.ps1 -Serve
 ```
 

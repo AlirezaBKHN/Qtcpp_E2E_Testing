@@ -142,9 +142,10 @@ if ($K) { $pytestArgs += @('-k', $K) }
 & $python @pytestArgs
 $pytestExit = $LASTEXITCODE
 
-# Report for THIS run (never an older report-less one) + open in the browser.
+# Report for THIS run (never an older report-less one), served over HTTP
+# (file:// breaks Allure 3) and opened in the default browser.
 & (Join-Path $PSScriptRoot 'run-allure.ps1') -Run (Split-Path $runDir -Leaf)
-$index = Join-Path $runDir 'allure-report\index.html'
-if (Test-Path $index) { Start-Process $index }
+$rel = $runDir.Substring($repo.Length).Replace('\', '/').TrimStart('/')
+& (Join-Path $PSScriptRoot 'serve-reports.ps1') -Open "$rel/allure-report/index.html"
 
 exit $pytestExit

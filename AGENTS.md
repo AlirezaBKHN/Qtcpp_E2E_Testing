@@ -84,9 +84,11 @@ C++ toolchain paths are absolute defaults in `scripts/build.ps1` (overridable vi
 - **Suites & the demo failure:** `automation/suites.json` maps suite names to test-file
   names (relative to `automation/tests`, `.py` optional). `run-tests.ps1` offers an
   interactive menu or `-Suite <name>|all`, pre-flights the app build and Appium (:4723,
-  skipped with `DRIVER_MODE=direct`), then generates the run's report and opens
-  `index.html` in the default browser. **TC019 is an INTENTIONAL demo failure — never
-  "fix" it.** Expected full-suite result: 24 passed, 1 failed.
+  skipped with `DRIVER_MODE=direct`), then generates the run's report and opens it in the
+  default browser **served over HTTP** by `scripts\serve-reports.ps1` (python http.server
+  on a free port, remembered in `reports\.server-port`; `file://` breaks Allure 3). **TC019
+  is an INTENTIONAL demo failure — never "fix" it.** Expected full-suite result: 24 passed,
+  1 failed.
 - **Per-test DB isolation (fixture system, spec 2026-10-20):** `database/fixtures/` holds the
   COMMITTED `.db` fixtures — the only source of truth; the fixtures' bytes must stay
   byte-clean across runs (never open one read-write). `database/signaltracker.db` is a
