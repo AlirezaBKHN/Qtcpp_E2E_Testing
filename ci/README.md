@@ -1,6 +1,19 @@
-# CI/CD Flow (documentation only)
+# CI/CD Flow
 
-Future pipeline shape — no pipeline code ships in this demo repo.
+Pipeline code now ships (design 2026-10-21, grilled and confirmed with the owner):
+
+- `.github/workflows/ci.yml` — PRs to `main`: build + native ctest gate.
+- `.github/workflows/e2e-nightly.yml` — nightly cron + manual: full E2E suite
+  (TC019 deselected) with `DRIVER_MODE=direct` on a hosted Windows runner.
+- `.github/workflows/tags.yml` — pushed tags: native + full E2E, artifacts
+  only (demo app, no release publishing).
+
+Runner prereqs codified in the workflows: Qt 6.8.3 win64_mingw + MinGW 13.1.0
+(install-qt-action, wired via `IST_*`), WinAppDriver 1.2.1 MSI + Developer
+Mode registry key, WinAppDriver started on :4729 before pytest (conftest's
+`stack_available` probes the port before the factory can start it).
+
+The historical sketch below predates the implementation.
 
 ```text
 Commit

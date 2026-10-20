@@ -1,0 +1,175 @@
+# Tag tier (design 2026-10-21): a pushed tag runs the full verification
+# pass (native + E2E). Demo app: no release publishing - the windeployqt'd
+# app folder is already a workflow artifact candidate, but per decision we
+# publish nothing beyond test reports.
+name: tags
+
+on:
+  push:
+    tags: ['**']
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: native (app_smoke + app_dbtest)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install CMake 3.30.5 + Ninja
+        uses: lukka/get-cmake@v4
+        with:
+          cmakeVersion: '3.30.5'
+
+      - name: Install Qt 6.8.3 (win64_mingw) + MinGW toolchain
+        uses: jurplegal/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: win64_mingw
+          dir: 'C:\Qt'
+          modules: 'qtcharts'
+          tools: 'tools_mingw1310'
+          cache: true
+
+      - name: Wire IST_* tool paths
+        shell: pwsh
+        run: |
+          $gxx = (Get-ChildItem 'C:\Qt\Tools\mingw*\bin\g++.exe' |
+                  Select-Object -First 1).FullName
+          if (-not $gxx) { throw 'MinGW g++ not found under C:\Qt\Tools\mingw*' }
+          Add-Content $env:GITHUB_ENV "IST_QT_BIN=C:\Qt\6.8.3\mingw_64\bin"
+          Add-Content $env:GITHUB_ENV "IST_GCC=$(Join-Path (Split-Path $gxx -Parent) 'gcc.exe')"
+          Add-Content $env:GITHUB_ENV "IST_GXX=$gxx"
+          Add-Content $env:GITHUB_ENV "IST_CMAKE=$((Get-Command cmake.exe).Source)"
+          Add-Content $env:GITHUB_ENV "IST_NINJA=$((Get-Command ninja.exe).Source)"
+
+      - name: Build + deploy Qt runtime
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File scripts\build.ps1
+
+      - name: ctest (app_smoke + app_dbtest)
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File scripts\restore-fixture.ps1
+          $env:PATH = "C:\Qt\6.8.3\mingw_64\bin;$(Split-Path $env:IST_GXX -Parent);$env:PATH"
+          ctest --test-dir app\build-mingw --output-on-failure
+
+      - name: Upload ctest log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-log
+          path: app/build-mingw/Testing/Temporary/LastTest.log
+          retention-days: 14
+          if-no-files-found: ignore
+
+  e2e:
+    name: e2e (full suite, TC019 deselected)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      DRIVER_MODE: direct
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: automation/requirements.txt
+
+      - name: Install test deps + Allure CLI
+        shell: pwsh
+        run: |
+          pip install -r automation\requirements.txt
+          npm install -g allure@3.21.0
+
+      - name: Install CMake 3.30.5 + Ninja
+        uses: lukka/get-cmake@v4
+        with:
+          cmakeVersion: '3.30.5'
+
+      - name: Install Qt 6.8.3 (win64_mingw) + MinGW toolchain
+        uses: jurplegal/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: win64_mingw
+          dir: 'C:\Qt'
+          modules: 'qtcharts'
+          tools: 'tools_mingw1310'
+          cache: true
+
+      - name: Wire IST_* tool paths
+        shell: pwsh
+        run: |
+          $gxx = (Get-ChildItem 'C:\Qt\Tools\mingw*\bin\g++.exe' |
+                  Select-Object -First 1).FullName
+          if (-not $gxx) { throw 'MinGW g++ not found under C:\Qt\Tools\mingw*' }
+          Add-Content $env:GITHUB_ENV "IST_QT_BIN=C:\Qt\6.8.3\mingw_64\bin"
+          Add-Content $env:GITHUB_ENV "IST_GCC=$(Join-Path (Split-Path $gxx -Parent) 'gcc.exe')"
+          Add-Content $env:GITHUB_ENV "IST_GXX=$gxx"
+          Add-Content $env:GITHUB_ENV "IST_CMAKE=$((Get-Command cmake.exe).Source)"
+          Add-Content $env:GITHUB_ENV "IST_NINJA=$((Get-Command ninja.exe).Source)"
+
+      - name: Build + deploy Qt runtime
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File scripts\build.ps1
+
+      - name: Enable Developer Mode + install WinAppDriver 1.2.1
+        shell: pwsh
+        run: |
+          reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /v AllowDevelopmentWithoutDevLicense /t REG_DWORD /d 1 /f
+          $msi = Join-Path $env:RUNNER_TEMP 'WindowsApplicationDriver-1.2.1-win10.msi'
+          Invoke-WebRequest -Uri 'https://github.com/microsoft/WinAppDriver/releases/download/v1.2.1/WindowsApplicationDriver-1.2.1-win10.msi' -OutFile $msi
+          Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /norestart" -Wait
+          $exe = "${env:ProgramFiles(x86)}\Windows Application Driver\WinAppDriver.exe"
+          if (-not (Test-Path $exe)) { throw 'WinAppDriver.exe missing after MSI install' }
+
+      - name: Start WinAppDriver on :4729
+        shell: pwsh
+        run: |
+          $exe = "${env:ProgramFiles(x86)}\Windows Application Driver\WinAppDriver.exe"
+          Start-Process -FilePath $exe -ArgumentList '4729'
+          $ok = $false
+          for ($i = 0; $i -lt 30; $i++) {
+            try { $c = New-Object System.Net.Sockets.TcpClient('127.0.0.1', 4729); $c.Close(); $ok = $true; break }
+            catch { Start-Sleep -Seconds 1 }
+          }
+          if (-not $ok) { throw 'WinAppDriver never answered on 4729' }
+
+      - name: Run E2E suite (TC019 deselected)
+        shell: pwsh
+        working-directory: automation
+        run: |
+          $results = Join-Path $env:GITHUB_WORKSPACE 'reports\allure-results'
+          python -m pytest tests -v --alluredir=$results --deselect tests/test_tc019_demo_failure.py::test_tc019_demo_failure
+
+      - name: Generate Allure report
+        if: always()
+        shell: pwsh
+        run: |
+          $results = Join-Path $env:GITHUB_WORKSPACE 'reports\allure-results'
+          $report  = Join-Path $env:GITHUB_WORKSPACE 'reports\allure-report'
+          $ok = $false
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            if (Test-Path $report) { Remove-Item -Recurse -Force $report }
+            allure generate "$results" -o "$report" --clean
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            Write-Host "allure generate failed (exit $LASTEXITCODE), retry $attempt/3 ..."
+            Start-Sleep -Seconds (2 * $attempt)
+          }
+          if (-not $ok) { throw 'allure generate kept failing after 3 attempts' }
+
+      - name: Upload Allure results + report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-allure
+          path: |
+            reports/allure-results/
+            reports/allure-report/
+          retention-days: 14
