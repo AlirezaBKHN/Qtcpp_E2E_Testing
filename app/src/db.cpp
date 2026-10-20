@@ -17,6 +17,25 @@
 
 namespace {
 
+// Appends the inclusive day-range clauses on sample_time's date part.
+// ISO-8601 text compares lexicographically, so string comparison == date
+// comparison. An invalid (default) QDate = unbounded on that side.
+void appendDateClause(const QDate& from, const QDate& to, QStringList& clauses)
+{
+    if (from.isValid())
+        clauses << QStringLiteral("substr(sample_time, 1, 10) >= :from");
+    if (to.isValid())
+        clauses << QStringLiteral("substr(sample_time, 1, 10) <= :to");
+}
+
+void bindDates(QSqlQuery& query, const QDate& from, const QDate& to)
+{
+    if (from.isValid())
+        query.bindValue(":from", from.toString(Qt::ISODate));
+    if (to.isValid())
+        query.bindValue(":to", to.toString(Qt::ISODate));
+}
+
 // Single source of truth: province -> its cities (plan Global Constraints,
 // option (c), 17 cities). cityCombo contents for "All" are every city of
 // every province in listed order.
@@ -253,26 +272,39 @@ double Db::qualityFrom(double avgDbm)
     return (avgDbm + 120.0) / 0.7;
 }
 
-double Db::networkQuality()
+double Db::networkQuality(const QDate& from, const QDate& to)
 {
+    QStringList clauses;
+    appendDateClause(from, to, clauses);
+    QString sql = QStringLiteral("SELECT AVG(signal_strength) FROM cells");
+    if (!clauses.isEmpty())
+        sql += QStringLiteral(" WHERE ") + clauses.join(QStringLiteral(" AND "));
     QSqlQuery q(QSqlDatabase::database());
-    q.prepare("SELECT AVG(signal_strength) FROM cells");
+    q.prepare(sql);
+    bindDates(q, from, to);
     q.exec();
     if (!q.next())
         return 0.0;
     return qualityFrom(q.value(0).toDouble());
 }
 
-int Db::cellCount()
+int Db::cellCount(const QDate& from, const QDate& to)
 {
+    QStringList clauses;
+    appendDateClause(from, to, clauses);
+    QString sql = QStringLiteral("SELECT COUNT(*) FROM cells");
+    if (!clauses.isEmpty())
+        sql += QStringLiteral(" WHERE ") + clauses.join(QStringLiteral(" AND "));
     QSqlQuery q(QSqlDatabase::database());
-    q.prepare("SELECT COUNT(*) FROM cells");
+    q.prepare(sql);
+    bindDates(q, from, to);
     q.exec();
     return q.next() ? q.value(0).toInt() : 0;
 }
 
 QVector<LabelAvg> Db::dailyQuality(const QString& groupColumn,
-                                  const QString& groupValue)
+                                  const QString& groupValue,
+                                  const QDate& from, const QDate& to)
 {
     QVector<LabelAvg> points;
     QSqlDatabase db = QSqlDatabase::database();
@@ -290,14 +322,19 @@ QVector<LabelAvg> Db::dailyQuality(const QString& groupColumn,
     QString sql = QStringLiteral(
                       "SELECT substr(sample_time, 1, 10) AS day,"
                       " AVG(signal_strength) FROM cells");
+    QStringList clauses;
     if (filtered)
-        sql += QStringLiteral(" WHERE %1 = :v").arg(groupColumn);
+        clauses << QStringLiteral("%1 = :v").arg(groupColumn);
+    appendDateClause(from, to, clauses);
+    if (!clauses.isEmpty())
+        sql += QStringLiteral(" WHERE ") + clauses.join(QStringLiteral(" AND "));
     sql += QLatin1String(" GROUP BY day ORDER BY day");
 
     QSqlQuery q(db);
     q.prepare(sql);
     if (filtered)
         q.bindValue(":v", groupValue);
+    bindDates(q, from, to);
     q.exec();
     while (q.next())
         points.append({q.value(0).toString(),
@@ -305,19 +342,43 @@ QVector<LabelAvg> Db::dailyQuality(const QString& groupColumn,
     return points;
 }
 
-QVector<QStringList> Db::worstCells(int limit)
+QVector<QStringList> Db::worstCells(int limit, const QString& province,
+                                    const QString& city, const QString& technology,
+                                    const QString& operatorName,
+                                    const QDate& from, const QDate& to)
 {
     QVector<QStringList> rows;
     QSqlDatabase db = QSqlDatabase::database();
     if (!db.isValid())
         return rows;
 
+    QStringList clauses;
+    clauses << QStringLiteral("signal_strength < -102.5");
+    if (!province.isEmpty() && province != QLatin1String("All"))
+        clauses << "province = :province";
+    if (!city.isEmpty() && city != QLatin1String("All"))
+        clauses << "city = :city";
+    if (!technology.isEmpty() && technology != QLatin1String("All"))
+        clauses << "technology = :technology";
+    if (!operatorName.isEmpty() && operatorName != QLatin1String("All"))
+        clauses << "operator = :operator";
+    appendDateClause(from, to, clauses);
+
     QSqlQuery q(db);
-    q.prepare("SELECT id, province, city, operator, technology,"
-              " signal_strength, sample_time FROM cells"
-              " WHERE signal_strength < -102.5"
-              " ORDER BY signal_strength ASC, id ASC LIMIT :l");
+    q.prepare(QStringLiteral("SELECT id, province, city, operator, technology,"
+                             " signal_strength, sample_time FROM cells WHERE ")
+              + clauses.join(QStringLiteral(" AND "))
+              + QStringLiteral(" ORDER BY signal_strength ASC, id ASC LIMIT :l"));
     q.bindValue(":l", limit);
+    if (clauses.contains("province = :province"))
+        q.bindValue(":province", province);
+    if (clauses.contains("city = :city"))
+        q.bindValue(":city", city);
+    if (clauses.contains("technology = :technology"))
+        q.bindValue(":technology", technology);
+    if (clauses.contains("operator = :operator"))
+        q.bindValue(":operator", operatorName);
+    bindDates(q, from, to);
     q.exec();
     while (q.next()) {
         QStringList row;
@@ -329,7 +390,8 @@ QVector<QStringList> Db::worstCells(int limit)
 }
 
 FilterBindings Db::queryFilters(const QString& province, const QString& city,
-                                const QString& technology, const QString& operatorName)
+                                const QString& technology, const QString& operatorName,
+                                const QDate& from, const QDate& to)
 {
     FilterBindings rows;
     QSqlDatabase db = QSqlDatabase::database();
@@ -345,6 +407,7 @@ FilterBindings Db::queryFilters(const QString& province, const QString& city,
         clauses << "technology = :technology";
     if (!operatorName.isEmpty() && operatorName != QLatin1String("All"))
         clauses << "operator = :operator";
+    appendDateClause(from, to, clauses);
 
     QString sql = "SELECT id, province, city, operator, technology, signal_strength,"
                   " sample_time FROM cells";
@@ -366,6 +429,7 @@ FilterBindings Db::queryFilters(const QString& province, const QString& city,
         q.bindValue(":technology", technology);
     if (clauses.contains("operator = :operator"))
         q.bindValue(":operator", operatorName);
+    bindDates(q, from, to);
     q.exec();
 
     while (q.next())
@@ -376,8 +440,10 @@ FilterBindings Db::queryFilters(const QString& province, const QString& city,
 
 QVector<LabelAvg> Db::avgBy(const QString& groupColumn, const QString& province,
                             const QString& city, const QString& technology,
-                            const QString& operatorName)
-{    QVector<LabelAvg> points;
+                            const QString& operatorName,
+                            const QDate& from, const QDate& to)
+{
+    QVector<LabelAvg> points;
     if (groupColumn != QLatin1String("operator")
         && groupColumn != QLatin1String("technology")
         && groupColumn != QLatin1String("province"))
@@ -399,6 +465,7 @@ QVector<LabelAvg> Db::avgBy(const QString& groupColumn, const QString& province,
         clauses << "technology = :technology";
     if (!operatorName.isEmpty() && operatorName != QLatin1String("All"))
         clauses << "operator = :operator";
+    appendDateClause(from, to, clauses);
     if (!clauses.isEmpty())
         sql += " WHERE " + clauses.join(" AND ");
     sql += " GROUP BY " + groupColumn;
@@ -409,10 +476,69 @@ QVector<LabelAvg> Db::avgBy(const QString& groupColumn, const QString& province,
     q.bindValue(":city", city);
     q.bindValue(":technology", technology);
     q.bindValue(":operator", operatorName);
+    bindDates(q, from, to);
     q.exec();
     while (q.next())
         points.append({q.value(0).toString(), q.value(1).toDouble()});
     return points;
+}
+
+QVector<QPair<QString, int>> Db::countBy(const QString& groupColumn,
+                                         const QString& province,
+                                         const QString& city,
+                                         const QString& technology,
+                                         const QString& operatorName,
+                                         const QDate& from, const QDate& to)
+{
+    QVector<QPair<QString, int>> points;
+    if (groupColumn != QLatin1String("operator")
+        && groupColumn != QLatin1String("technology")
+        && groupColumn != QLatin1String("province"))
+        return points;
+
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isValid())
+        return points;
+
+    // Only the whitelisted labels reach %1 (validated above).
+    QString sql = QStringLiteral("SELECT %1, COUNT(*) FROM cells").arg(groupColumn);
+    QStringList clauses;
+    if (!province.isEmpty() && province != QLatin1String("All"))
+        clauses << "province = :province";
+    if (!city.isEmpty() && city != QLatin1String("All"))
+        clauses << "city = :city";
+    if (!technology.isEmpty() && technology != QLatin1String("All"))
+        clauses << "technology = :technology";
+    if (!operatorName.isEmpty() && operatorName != QLatin1String("All"))
+        clauses << "operator = :operator";
+    appendDateClause(from, to, clauses);
+    if (!clauses.isEmpty())
+        sql += " WHERE " + clauses.join(" AND ");
+    sql += " GROUP BY " + groupColumn + " ORDER BY " + groupColumn + " ASC";
+
+    QSqlQuery q(db);
+    q.prepare(sql);
+    q.bindValue(":province", province);
+    q.bindValue(":city", city);
+    q.bindValue(":technology", technology);
+    q.bindValue(":operator", operatorName);
+    bindDates(q, from, to);
+    q.exec();
+    while (q.next())
+        points.append({q.value(0).toString(), q.value(1).toInt()});
+    return points;
+}
+
+QPair<QDate, QDate> Db::dataEra()
+{
+    QSqlQuery q(QSqlDatabase::database());
+    q.prepare("SELECT MIN(substr(sample_time, 1, 10)),"
+              " MAX(substr(sample_time, 1, 10)) FROM cells");
+    q.exec();
+    if (!q.next())
+        return {QDate(), QDate()};
+    return {QDate::fromString(q.value(0).toString(), Qt::ISODate),
+            QDate::fromString(q.value(1).toString(), Qt::ISODate)};
 }
 
 bool Db::writeExportCsv(const QString& path, const QString& province,

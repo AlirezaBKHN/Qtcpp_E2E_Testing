@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QDate>
 #include <QString>
 #include <QVariantList>
 #include <QVector>
@@ -28,16 +29,32 @@ public:
     static QStringList citiesFor(const QString& province);
     static bool isProvince(const QString& province);
 
-    // Filtered rows; empty argument = no filter on that column.
+    // Filtered rows; empty argument = no filter on that column. The date
+    // bounds are inclusive day ranges on sample_time's date part; an
+    // invalid (default) QDate = unbounded on that side.
     static FilterBindings queryFilters(const QString& province, const QString& city,
                                        const QString& technology,
-                                       const QString& operatorName);
+                                       const QString& operatorName,
+                                       const QDate& from = {},
+                                       const QDate& to = {});
 
     // (label, avg(signal_strength)) series for the chart. The group column
     // is whitelisted (province/operator/technology); empty filter args are no-op.
     static QVector<LabelAvg> avgBy(const QString& groupColumn, const QString& province,
                                    const QString& city, const QString& technology,
-                                   const QString& operatorName);
+                                   const QString& operatorName,
+                                   const QDate& from = {},
+                                   const QDate& to = {});
+
+    // (label, COUNT(*)) series, same whitelisting and filter semantics as
+    // avgBy - the slice data for the share charts.
+    static QVector<QPair<QString, int>> countBy(const QString& groupColumn,
+                                                const QString& province,
+                                                const QString& city,
+                                                const QString& technology,
+                                                const QString& operatorName,
+                                                const QDate& from = {},
+                                                const QDate& to = {});
 
     // Writes the current (filtered) view as CSV: one header line + one line
     // per row. Returns false if the file cannot be created. Zero-row filters
@@ -59,15 +76,29 @@ public:
     // 0..100 quality metric ((avg dBm + 120) / 0.7); every quality number
     // in UI or tests derives through it - never inline the transform.
     static double qualityFrom(double avgDbm);
-    static double networkQuality();
-    static int cellCount();
+    static double networkQuality(const QDate& from = {},
+                                 const QDate& to = {});
+    static int cellCount(const QDate& from = {},
+                         const QDate& to = {});
     // (YYYY-MM-DD, quality) pairs ascending; groupColumn must be one of
     // province/operator/technology and groupValue filters that column -
     // empty groupValue = the whole network. Always exactly 7 buckets on the
-    // seeded era (Task 2).
+    // seeded era (Task 2). Date bounds as in queryFilters.
     static QVector<LabelAvg> dailyQuality(const QString& groupColumn,
-                                         const QString& groupValue);
+                                         const QString& groupValue,
+                                         const QDate& from = {},
+                                         const QDate& to = {});
     // Weakest rows first (strength < -102.5 dBm = quality below 25%),
-    // capped at limit; column order matches the main table.
-    static QVector<QStringList> worstCells(int limit = 8);
+    // capped at limit; column order matches the main table. Accepts the
+    // same filter set as queryFilters (dashboard/report filters reach it).
+    static QVector<QStringList> worstCells(int limit = 8,
+                                           const QString& province = {},
+                                           const QString& city = {},
+                                           const QString& technology = {},
+                                           const QString& operatorName = {},
+                                           const QDate& from = {},
+                                           const QDate& to = {});
+    // (MIN, MAX) of the cells table's date part as QDates (invalid when the
+    // table is empty) - the default range for the date filter widgets.
+    static QPair<QDate, QDate> dataEra();
 };

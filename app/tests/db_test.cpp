@@ -1,5 +1,6 @@
 // TDD test for Db (database layer). No Qt widgets, no GUI.
 #include <QCoreApplication>
+#include <QDate>
 #include <QDateTime>
 #include <QFile>
 #include <QHash>
@@ -331,6 +332,110 @@ int main(int argc, char* argv[])
             for (int j = 1; j < worst.size(); ++j) {
                 CHECK(worst.at(j).at(5).toInt() >= worst.at(j - 1).at(5).toInt());
             }
+        }
+    }
+
+    // 12. Date-range filters, countBy, dataEra (spec 2026-10-20 dashboard/
+    // reports filters). Defaults keep every existing caller unbounded.
+    {
+        // dataEra: MIN/MAX day of the seeded table, exactly 7 days apart.
+        const auto era = Db::dataEra();
+        CHECK(era.first.isValid() && era.second.isValid());
+        CHECK(era.first.addDays(6) == era.second);
+
+        // A mid-era split point; ranges are inclusive day bounds.
+        const QDate mid = era.first.addDays(3);
+
+        // Splits total: [era.first, mid] + (mid, era.last] == all rows.
+        CHECK(Db::cellCount(era.first, mid) + Db::cellCount(mid.addDays(1), era.second)
+              == Db::cellCount());
+        CHECK(Db::queryFilters(QString(), QString(), QString(), QString(),
+                               era.first, mid).size()
+              + Db::queryFilters(QString(), QString(), QString(), QString(),
+                                 mid.addDays(1), era.second).size()
+              == Db::queryFilters(QString(), QString(), QString(), QString()).size());
+
+        // Inclusive bounds: a single-day range counts that day's rows.
+        {
+            const QString dayStr = era.first.toString(Qt::ISODate);
+            QSqlQuery q(QSqlDatabase::database());
+            q.prepare("SELECT COUNT(*) FROM cells WHERE substr(sample_time, 1, 10) = :d");
+            q.bindValue(":d", dayStr);
+            q.exec();
+            q.next();
+            const int dayRows = q.value(0).toInt();
+            CHECK(dayRows > 0);
+            CHECK(Db::cellCount(era.first, era.first) == dayRows);
+            CHECK(Db::queryFilters(QString(), QString(), QString(), QString(),
+                                   era.first, era.first).size() == dayRows);
+        }
+
+        // Unbounded defaults equal the no-arg overloads.
+        CHECK(Db::cellCount(QDate(), QDate()) == Db::cellCount());
+        CHECK(Db::networkQuality(QDate(), QDate()) == Db::networkQuality());
+        CHECK(Db::avgBy("operator", QString(), QString(), QString(), QString(),
+                        QDate(), QDate()).size()
+              == Db::avgBy("operator", QString(), QString(), QString(), QString()).size());
+
+        // Combined column + full-era date filter equals the column filter.
+        CHECK(Db::queryFilters("Fars", QString(), QString(), QString(),
+                               era.first, era.second).size()
+              == Db::queryFilters("Fars", QString(), QString(), QString()).size());
+
+        // Out-of-era range yields nothing.
+        CHECK(Db::cellCount(QDate(2020, 1, 1), QDate(2020, 1, 2)) == 0);
+        CHECK(Db::queryFilters(QString(), QString(), QString(), QString(),
+                               QDate(2020, 1, 1), QDate(2020, 1, 2)).isEmpty());
+
+        // countBy: GROUP BY + COUNT, cross-checked against queryFilters.
+        {
+            const auto byOperator = Db::countBy("operator", QString(), QString(),
+                                                QString(), QString());
+            CHECK(byOperator.size() == 4);
+            int total = 0;
+            for (const auto& slice : byOperator) {
+                CHECK(slice.second
+                      == Db::queryFilters(QString(), QString(), QString(), slice.first).size());
+                total += slice.second;
+            }
+            CHECK(total == 10080);
+            const auto byTech = Db::countBy("technology", QString(), QString(),
+                                            QString(), QString());
+            CHECK(byTech.size() == 4);
+            for (const auto& slice : byTech)
+                CHECK(slice.second
+                      == Db::queryFilters(QString(), QString(), slice.first, QString()).size());
+            // Whitelist guard.
+            CHECK(Db::countBy("hack", QString(), QString(), QString(), QString()).isEmpty());
+            // Filtered countBy narrows.
+            const auto farsByOperator =
+                Db::countBy("operator", "Fars", QString(), QString(), QString());
+            int farsTotal = 0;
+            for (const auto& slice : farsByOperator)
+                farsTotal += slice.second;
+            CHECK(farsTotal == Db::queryFilters("Fars", QString(), QString(), QString()).size());
+        }
+
+        // worstCells accepts the full filter set.
+        {
+            const auto worstFars = Db::worstCells(8, "Fars");
+            CHECK(!worstFars.isEmpty());
+            for (const auto& row : worstFars)
+                CHECK(row.at(1) == "Fars");
+            const auto worstDate = Db::worstCells(8, QString(), QString(), QString(),
+                                                  QString(), era.first, mid);
+            CHECK(worstDate.size() <= Db::worstCells(8).size());
+        }
+
+        // dailyQuality honors the date range (half-open right side unbounded).
+        {
+            const auto half = Db::dailyQuality(QString(), QString(), mid.addDays(1), QDate());
+            CHECK(half.size() == 3); // day indices 4..6 of the 7-day era
+            for (const auto& point : half)
+                CHECK(point.first >= mid.addDays(1).toString(Qt::ISODate));
+            const auto out = Db::dailyQuality(QString(), QString(),
+                                              QDate(2020, 1, 1), QDate(2020, 1, 2));
+            CHECK(out.isEmpty());
         }
     }
 
