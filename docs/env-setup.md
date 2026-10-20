@@ -31,3 +31,4 @@ Stack provisioned 2026-10-19 by the coding agent (see plan Task 1).
 
 - Appium server: `4723`
 - Direct WinAppDriver fallback: `4729`
+- WAD pins a driver session to ONE top-level window (attached sessions reject sessions rooted at the desktop). The auth flow crosses two top-level windows (sign-in dialog, main window), so `automation/drivers/factory.py` owns the app process and the DSL re-attaches the session per phase (`_attach_phase`); attach invalidates the per-phase element-handle cache. Direct-mode WAD needs a real console (CREATE_NEW_CONSOLE).
