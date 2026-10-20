@@ -1,3 +1,4 @@
+#include "dashboard_view.h"
 #include "mainwindow.h"
 #include "users_view.h"
 
@@ -182,8 +183,9 @@ MainWindow::MainWindow(const QString& user, QWidget* parent)
 
     // Dashboard/Reports arrive in Tasks 5/6; placeholders pin the tab order
     // now (replaced in place, never reordered).
+    // Home page + real dashboard (reports placeholder stays until Task 6).
     QWidget* homePage = makeStable(new QWidget(this), "homeTab");
-    QWidget* dashboardPage = makeStable(new QWidget(this), "dashboardTab");
+    QWidget* dashboardPage = new DashboardView(this);
     QWidget* reportsPage = makeStable(new QWidget(this), "reportsTab");
 
     // -- Home: routing cards.

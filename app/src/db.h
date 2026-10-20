@@ -45,4 +45,17 @@ public:
     static bool authUser(const QString& username, const QString& password);
     // The literal 'admin' account can never be removed; unknown users fail too.
     static bool removeUser(const QString& username);
+
+    // Dashboard aggregates (quality = (avg dBm + 120) / 0.7 on a 0..100 scale).
+    static double networkQuality();
+    static int cellCount();
+    // (YYYY-MM-DD, quality) pairs ascending; groupColumn must be one of
+    // province/operator/technology and groupValue filters that column -
+    // empty groupValue = the whole network. Always exactly 7 buckets on the
+    // seeded era (Task 2).
+    static QVector<LabelAvg> dailyQuality(const QString& groupColumn,
+                                         const QString& groupValue);
+    // Weakest rows first (strength < -102.5 dBm = quality below 25%),
+    // capped at limit; column order matches the main table.
+    static QVector<QStringList> worstCells(int limit = 8);
 };

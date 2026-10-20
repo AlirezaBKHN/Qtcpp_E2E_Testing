@@ -217,6 +217,81 @@ bool Db::removeUser(const QString& username)
     return q.numRowsAffected() > 0;
 }
 
+double Db::networkQuality()
+{
+    QSqlQuery q(QSqlDatabase::database());
+    q.prepare("SELECT AVG(signal_strength) FROM cells");
+    q.exec();
+    if (!q.next())
+        return 0.0;
+    return (q.value(0).toDouble() + 120.0) / 0.7;
+}
+
+int Db::cellCount()
+{
+    QSqlQuery q(QSqlDatabase::database());
+    q.prepare("SELECT COUNT(*) FROM cells");
+    q.exec();
+    return q.next() ? q.value(0).toInt() : 0;
+}
+
+QVector<LabelAvg> Db::dailyQuality(const QString& groupColumn,
+                                  const QString& groupValue)
+{
+    QVector<LabelAvg> points;
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isValid())
+        return points;
+
+    // Only the whitelisted group columns reach %1 (SQL-injection guard).
+    if (!groupColumn.isEmpty()
+        && groupColumn != QLatin1String("province")
+        && groupColumn != QLatin1String("operator")
+        && groupColumn != QLatin1String("technology"))
+        return points;
+
+    bool filtered = !groupValue.isEmpty() && !groupColumn.isEmpty();
+    QString sql = QStringLiteral(
+                      "SELECT substr(sample_time, 1, 10) AS day,"
+                      " AVG(signal_strength) FROM cells");
+    if (filtered)
+        sql += QStringLiteral(" WHERE %1 = :v").arg(groupColumn);
+    sql += QLatin1String(" GROUP BY day ORDER BY day");
+
+    QSqlQuery q(db);
+    q.prepare(sql);
+    if (filtered)
+        q.bindValue(":v", groupValue);
+    q.exec();
+    while (q.next())
+        points.append({q.value(0).toString(),
+                       (q.value(1).toDouble() + 120.0) / 0.7});
+    return points;
+}
+
+QVector<QStringList> Db::worstCells(int limit)
+{
+    QVector<QStringList> rows;
+    QSqlDatabase db = QSqlDatabase::database();
+    if (!db.isValid())
+        return rows;
+
+    QSqlQuery q(db);
+    q.prepare("SELECT id, province, city, operator, technology,"
+              " signal_strength, sample_time FROM cells"
+              " WHERE signal_strength < -102.5"
+              " ORDER BY signal_strength ASC, id ASC LIMIT :l");
+    q.bindValue(":l", limit);
+    q.exec();
+    while (q.next()) {
+        QStringList row;
+        for (int c = 0; c < 7; ++c)
+            row << q.value(c).toString();
+        rows.append(row);
+    }
+    return rows;
+}
+
 FilterBindings Db::queryFilters(const QString& province, const QString& city,
                                 const QString& technology, const QString& operatorName)
 {

@@ -9,6 +9,8 @@
 #include <QTextStream>
 #include <QVariant>
 
+#include <cmath>
+
 #include "../src/db.h"
 
 static int failures = 0;
@@ -228,6 +230,84 @@ int main(int argc, char* argv[])
         CHECK(Db::removeUser("tempuser"));
         CHECK(!Db::usernames().contains("tempuser"));
         CHECK(!Db::authUser("tempuser", "temppw"));
+    }
+
+    // 11. Dashboard aggregates (Task 5): cross-checked against independent
+    // straight SQL formulations of the same questions.
+    {
+        // networkQuality = (AVG(dBm) + 120) / 0.7 over the whole table.
+        {
+            QSqlQuery q("SELECT AVG(signal_strength) FROM cells");
+            q.next();
+            const double expected = (q.value(0).toDouble() + 120.0) / 0.7;
+            CHECK(qAbs(Db::networkQuality() - expected) < 1e-9);
+        }
+        CHECK(Db::cellCount() == 10080);
+
+        // Whole-network daily quality: exactly 7 ascending day buckets,
+        // each matching a plain GROUP BY on the date substring.
+        {
+            const auto points = Db::dailyQuality(QString(), QString());
+            CHECK(points.size() == 7);
+            for (int i = 1; i < points.size(); ++i)
+                CHECK(points.at(i - 1).first < points.at(i).first);
+            QSqlQuery q("SELECT substr(sample_time,1,10) AS day, AVG(signal_strength)"
+                        " FROM cells GROUP BY day ORDER BY day");
+            int i = 0;
+            while (q.next() && i < points.size()) {
+                CHECK(q.value(0).toString() == points.at(i).first);
+                const double expected = (q.value(1).toDouble() + 120.0) / 0.7;
+                CHECK(qAbs(expected - points.at(i).second) < 1e-9);
+                ++i;
+            }
+            CHECK(i == 7 && !q.next());
+        }
+        // Grouped by province.
+        {
+            const auto points =
+                Db::dailyQuality(QStringLiteral("province"), QStringLiteral("Tehran"));
+            CHECK(points.size() == 7);
+            QSqlQuery grouped(QSqlDatabase::database());
+            grouped.prepare("SELECT substr(sample_time,1,10) AS day, AVG(signal_strength)"
+                            " FROM cells WHERE province = :p GROUP BY day ORDER BY day");
+            grouped.bindValue(":p", QString::fromLatin1("Tehran"));
+            grouped.exec();
+            int i = 0;
+            while (grouped.next() && i < points.size()) {
+                CHECK(grouped.value(0).toString() == points.at(i).first);
+                const double expected = (grouped.value(1).toDouble() + 120.0) / 0.7;
+                CHECK(qAbs(expected - points.at(i).second) < 1e-9);
+                ++i;
+            }
+            CHECK(i == 7 && !grouped.next());
+        }
+        // Whitelist guard.
+        CHECK(Db::dailyQuality(QStringLiteral("hack"), QStringLiteral("x")).isEmpty());
+
+        // worstCells: weakest first, capped, integer strengths <= -103
+        // (strictly below the -102.5 quality-25% line).
+        {
+            const auto worst = Db::worstCells(8);
+            CHECK(worst.size() == 8);
+            QSqlQuery q("SELECT id, province, city, operator, technology,"
+                        " signal_strength, sample_time FROM cells"
+                        " WHERE signal_strength < -102.5"
+                        " ORDER BY signal_strength ASC, id ASC LIMIT 8");
+            for (const auto& row : worst) {
+                CHECK(row.size() == 7);
+                CHECK(row.at(5).toInt() <= -103);
+            }
+            int i = 0;
+            while (q.next() && i < worst.size()) {
+                CHECK(q.value(0).toString() == worst.at(i).at(0));
+                CHECK(q.value(5).toString() == worst.at(i).at(5));
+                ++i;
+            }
+            CHECK(i == 8 && !q.next());
+            for (int j = 1; j < worst.size(); ++j) {
+                CHECK(worst.at(j).at(5).toInt() >= worst.at(j - 1).at(5).toInt());
+            }
+        }
     }
 
     QFile::remove(QString::fromLatin1(kDbPath));

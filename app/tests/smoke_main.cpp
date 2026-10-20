@@ -10,6 +10,8 @@
 #include <QtCharts/QBarCategoryAxis>
 #include <QtCharts/QBarSet>
 #include <QtCharts/QChartView>
+#include <QtCharts/QDateTimeAxis>
+#include <QtCharts/QLineSeries>
 #include <QtCharts/QValueAxis>
 #include <QtTest>
 #include "db.h"
@@ -28,6 +30,7 @@ private slots:
     void registerModeValidation();
     void tabsAndHomeCards();
     void usersViewAdminOnly();
+    void dashboardContract();
 };
 
 static const char* kIds[] = {
@@ -253,6 +256,68 @@ void SmokeMain::usersViewAdminOnly()
         QVERIFY2(!btn->isEnabled(), "removeUserButton must be disabled for non-admin");
     }
     QFile::remove(scratch);
+}
+
+// Dashboard: KPI values equal the Db aggregates, 7-point trend on a
+// persistent axis, weakest cells list populated.
+void SmokeMain::dashboardContract()
+{
+    MainWindow admin(QString::fromLatin1("admin"));
+    admin.show();
+    admin.findChild<QPushButton*>(QString::fromLatin1("homeCardDashboard"))->click();
+    QTest::qWait(50);
+
+    auto* chartView = admin.findChild<QChartView*>(QString::fromLatin1("trendChart"));
+    QVERIFY2(chartView, "trendChart missing");
+    auto* chart = chartView->chart();
+    QVERIFY(chart);
+    QCOMPARE(chart->series().size(), 1);
+    QCOMPARE(chart->axes(Qt::Horizontal).size(), 1);
+    QCOMPARE(chart->axes(Qt::Vertical).size(), 1);
+    auto* series = qobject_cast<QLineSeries*>(chart->series().first());
+    QVERIFY(series != nullptr);
+    // Exactly the 7 day buckets the seeder guarantees (Task 2).
+    const auto trend = Db::dailyQuality(QString(), QString());
+    QCOMPARE(series->count(), trend.size());
+    QCOMPARE(series->count(), 7);
+
+    // Persistent year-month-day axis labels.
+    auto* axis = qobject_cast<QDateTimeAxis*>(chart->axes(Qt::Horizontal).first());
+    QVERIFY(axis != nullptr);
+    QCOMPARE(axis->format(), QStringLiteral("yyyy-MM-dd"));
+
+    // KPI values are the Db aggregates, not recomputed UI math.
+    auto* kpiAvgQuality = admin.findChild<QLabel*>(QString::fromLatin1("kpiAvgQuality"));
+    auto* kpiCells = admin.findChild<QLabel*>(QString::fromLatin1("kpiCells"));
+    auto* kpiBest = admin.findChild<QLabel*>(QString::fromLatin1("kpiBestOperator"));
+    auto* kpiWorst = admin.findChild<QLabel*>(QString::fromLatin1("kpiWorstOperator"));
+    QVERIFY(kpiAvgQuality && kpiCells && kpiBest && kpiWorst);
+    QCOMPARE(kpiAvgQuality->text(),
+             QString::number(Db::networkQuality(), 'f', 1) + QStringLiteral("%"));
+    QCOMPARE(kpiCells->text(),
+             QString::number(Db::cellCount()) + QStringLiteral(" cells"));
+    const auto byOperator =
+        Db::avgBy(QStringLiteral("operator"), QString(), QString(), QString(), QString());
+    QString best, worst;
+    double bestV = -1e300, worstV = 1e300;
+    for (const auto& point : byOperator) {
+        if (best.isEmpty() || point.second > bestV) {
+            bestV = point.second;
+            best = point.first;
+        }
+        if (worst.isEmpty() || point.second < worstV) {
+            worstV = point.second;
+            worst = point.first;
+        }
+    }
+    QCOMPARE(kpiBest->text(), best);
+    QCOMPARE(kpiWorst->text(), worst);
+
+    auto* worstList =
+        admin.findChild<QTableWidget*>(QString::fromLatin1("worstCellsList"));
+    QVERIFY(worstList);
+    QCOMPARE(worstList->rowCount(), 8);
+    QVERIFY(worstList->rowCount() >= 1);
 }
 
 // The chart must be readable as data, not just a graphic: per-bar value
