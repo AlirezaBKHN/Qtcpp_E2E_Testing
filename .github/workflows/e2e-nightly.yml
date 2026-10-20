@@ -86,6 +86,47 @@ jobs:
         shell: pwsh
         run: powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 
+      # TEMPORARY SPIKE DIAGNOSTIC (remove once E2E is green): launches the
+      # app standalone on the runner desktop and captures what actually
+      # happens - process alive? window title? crash event? desktop look?
+      - name: Diagnose app launch on runner desktop
+        shell: pwsh
+        run: |
+          $diag = Join-Path $env:GITHUB_WORKSPACE 'diagnostics'
+          New-Item -ItemType Directory -Force $diag | Out-Null
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+          $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          "screen: $($bounds.Width)x$($bounds.Height)" | Out-File "$diag\env.txt"
+          Get-Process | Where-Object MainWindowTitle |
+            Select-Object Id, ProcessName, MainWindowTitle |
+            Out-File "$diag\windows-before.txt" -Width 300
+          Start-Process -FilePath (Join-Path $env:GITHUB_WORKSPACE 'app\build-mingw\IranSignalTracker.exe')
+          Start-Sleep -Seconds 10
+          Get-Process | Where-Object { $_.Name -like '*IranSignalTracker*' } |
+            Select-Object Id, ProcessName, Responding, MainWindowTitle |
+            Out-File "$diag\app-process.txt" -Width 300
+          Get-Process | Where-Object MainWindowTitle |
+            Select-Object Id, ProcessName, MainWindowTitle |
+            Out-File "$diag\windows-after.txt" -Width 300
+          Get-WinEvent -LogName Application -MaxEvents 50 -ErrorAction SilentlyContinue |
+            Where-Object { $_.LevelDisplayName -eq 'Error' } |
+            Select-Object TimeCreated, ProviderName, Id, Message |
+            Out-File "$diag\eventlog-errors.txt" -Width 400
+          $bmp = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
+          $g = [System.Drawing.Graphics]::FromImage($bmp)
+          $g.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+          $bmp.Save("$diag\desktop.png")
+          Stop-Process -Name IranSignalTracker -Force -ErrorAction SilentlyContinue
+
+      - name: Upload launch diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-diagnostics
+          path: diagnostics/
+          retention-days: 7
+
       # WAD exits 0x80004005 without Developer Mode (docs/env-setup.md).
       - name: Enable Developer Mode + install WinAppDriver 1.2.1
         shell: pwsh
