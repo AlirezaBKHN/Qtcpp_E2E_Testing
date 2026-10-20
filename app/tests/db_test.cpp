@@ -2,6 +2,7 @@
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QFile>
+#include <QHash>
 #include <QSet>
 #include <QSqlDatabase>
 #include <QSqlQuery>
@@ -39,13 +40,13 @@ int main(int argc, char* argv[])
     QCoreApplication app(argc, argv);
     QFile::remove(QString::fromLatin1(kDbPath));
 
-    // 1. init creates + seeds exactly 1500 rows.
+    // 1. init creates + seeds exactly 10080 rows (7 days x 1440).
     CHECK(Db::init(QString::fromLatin1(kDbPath)));
-    CHECK(countRows() == 1500);
+    CHECK(countRows() == 10080);
 
     // 2. Re-init on an existing file must not duplicate the seed.
     CHECK(Db::init(QString::fromLatin1(kDbPath)));
-    CHECK(countRows() == 1500);
+    CHECK(countRows() == 10080);
 
     // 3. Row content legality + province->city mapping.
     {
@@ -68,7 +69,7 @@ int main(int argc, char* argv[])
             CHECK(!legalCities.isEmpty());
             CHECK(legalCities.contains(city));
         }
-        CHECK(samples == 1500);
+        CHECK(samples == 10080);
         for (const char* p : kProvinces)
             CHECK(provinces.contains(QString::fromLatin1(p)));
         for (const char* o : kOperators)
@@ -85,8 +86,8 @@ int main(int argc, char* argv[])
         for (const auto& row : rows)
             CHECK(row.at(2).toString() == "Shiraz");
     }
-    // No filter -> 1500 rows.
-    CHECK(Db::queryFilters(QString(), QString(), QString(), QString()).size() == 1500);
+    // No filter -> 10080 rows.
+    CHECK(Db::queryFilters(QString(), QString(), QString(), QString()).size() == 10080);
     // Impossible combo -> 0 rows (app never writes outside the map).
     {
         const auto rows = Db::queryFilters("Fars", "Tabriz", QString(), QString());
@@ -105,10 +106,10 @@ int main(int argc, char* argv[])
         CHECK(points.size() >= 1 && points.size() <= 4);
     }
 
-    // 6. Delete + re-init reseeds to 1500.
+    // 6. Delete + re-init reseeds to 10080.
     QFile::remove(QString::fromLatin1(kDbPath));
     CHECK(Db::init(QString::fromLatin1(kDbPath)));
-    CHECK(countRows() == 1500);
+    CHECK(countRows() == 10080);
 
     // 7. writeExportCsv writes header + one line per filtered row.
     {
@@ -150,7 +151,39 @@ int main(int argc, char* argv[])
         QFile::remove(path);
     }
 
-    // 9. users table: seeded credentials + auth/register/remove/list APIs.
+    // 9. Timestamps span exactly 7 UTC date buckets (trend granularity).
+    // Per-province counts are pinned to the regenerated committed DB
+    // (app_dbgen, std::mt19937(20241019)) so seed drift is caught.
+    {
+        const QHash<QString, int> kProvinceCounts{
+            {"Tehran", 1025}, {"Mazandaran", 978}, {"Fars", 1023},
+            {"Isfahan", 1021}, {"Khuzestan", 1015}, {"Khorasan Razavi", 1019},
+        };
+        for (auto it = kProvinceCounts.constBegin(); it != kProvinceCounts.constEnd(); ++it) {
+            QSqlQuery q(QSqlDatabase::database());
+            q.prepare("SELECT COUNT(*) FROM cells WHERE province = :p");
+            q.bindValue(":p", it.key());
+            q.exec();
+            q.next();
+            CHECK(q.value(0).toInt() == it.value());
+        }
+    }
+    {
+        QSet<QString> dates;
+        QSqlQuery q("SELECT DISTINCT substr(sample_time, 1, 10) FROM cells");
+        while (q.next())
+            dates.insert(q.value(0).toString());
+        CHECK(dates.size() == 7);
+        // Every row sits inside a 7-day window ending "today" (UTC).
+        const QDate today = QDateTime::currentDateTimeUtc().date();
+        for (const QString& dateStr : dates) {
+            CHECK(dateStr.size() == 10);
+            CHECK(QDate::fromString(dateStr, Qt::ISODate) > today.addDays(-7));
+            CHECK(QDate::fromString(dateStr, Qt::ISODate) <= today);
+        }
+    }
+
+    // 10. users table: seeded credentials + auth/register/remove/list APIs.
     {
         // Seeded users exist and are sorted.
         const QStringList names = Db::usernames();

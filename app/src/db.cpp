@@ -38,7 +38,9 @@ const struct {
 const char* kOperators[] = {"MCI", "Irancell", "Rightel", "Shatel Mobile"};
 const char* kTechnologies[] = {"2G", "3G", "4G", "5G"};
 
-constexpr int kSeedRows = 1500;
+constexpr int kSeedDays = 7;
+constexpr int kRowsPerDay = 1440; // 10080 total: clean 7 trend buckets
+constexpr int kSeedRows = kSeedDays * kRowsPerDay;
 constexpr uint32_t kFixedSeed = 20241019u;
 constexpr int kSeedMinStrength = -120;
 constexpr int kSeedMaxStrength = -50;
@@ -82,8 +84,13 @@ void seed(QSqlDatabase& db)
     std::uniform_int_distribution<int> operatorDist(0, int(std::size(kOperators)) - 1);
     std::uniform_int_distribution<int> technologyDist(0, int(std::size(kTechnologies)) - 1);
     std::uniform_int_distribution<int> strengthDist(kSeedMinStrength, kSeedMaxStrength);
+    std::uniform_int_distribution<int> secondDist(0, 86399);
 
-    QDateTime sampleTime = QDateTime::currentDateTimeUtc();
+    // Day-bucketed timestamps: rows 0..1430.. land in day buckets
+    // (utcToday-6) .. utcToday so per-day quality always yields exactly
+    // kSeedDays entries.
+    const QDate today = QDateTime::currentDateTimeUtc().date();
+    const QDateTime eraStartUtc(today, QTime(0, 0, 0), Qt::UTC);
 
     db.transaction();
     QSqlQuery insert(db);
@@ -93,12 +100,14 @@ void seed(QSqlDatabase& db)
         const int p = provinceDist(rng);
         const QStringList cities = splitCities(kMap[p].cities);
         std::uniform_int_distribution<int> cityDist(0, cities.size() - 1);
+        const int day = i / kRowsPerDay;
         insert.addBindValue(QString::fromLatin1(kMap[p].province));
         insert.addBindValue(cities.at(cityDist(rng)));
         insert.addBindValue(QString::fromLatin1(kOperators[operatorDist(rng)]));
         insert.addBindValue(QString::fromLatin1(kTechnologies[technologyDist(rng)]));
         insert.addBindValue(strengthDist(rng));
-        sampleTime = sampleTime.addSecs(-60);
+        const QDateTime sampleTime = eraStartUtc.addDays(-6 + day)
+                                         .addSecs(secondDist(rng));
         insert.addBindValue(sampleTime.toString(Qt::ISODate));
         insert.exec();
     }
