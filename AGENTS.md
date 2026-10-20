@@ -59,13 +59,18 @@ C++ toolchain paths are absolute defaults in `scripts/build.ps1` (overridable vi
   context.
 - **Find performance is architecture, not tuning:** every root find re-walks the whole UIA
   tree. Countermeasures (keep them): (1) the app exposes small named sections
-  (`filterSection`, `headerSection`) and `find_within()` scopes finds into them; (2) the
-  per-phase handle cache in `resolve_element` reuses element refs across steps within a
-  phase (invalidated on phase attach); (3) the table widget displays at most the first
-  `kMaxDisplayedRows = 200` rows — the status bar and the CSV export keep the FULL query
-  size (owner decision; pagination is future work on top of the cap). Probed: full tree
-  walks cost ~11s/find on the fat table; with the cap + sections the whole probe runs in
-  ~35s.
+  (`filterSection`, `headerSection`, `pagerSection`) and `find_within()` scopes finds into
+  them; (2) the per-phase handle cache in `resolve_element` reuses element refs across steps
+  within a phase (invalidated on phase attach); (3) the table is PAGINATED (page-size
+  selector 50/100/200/1000, default 200; page 1 == the old display cap) — the status bar and
+  the CSV export keep the FULL query size. Probed: full tree walks cost ~11s/find on the fat
+  table; with pagination + sections the whole probe runs in ~35s.
+- **UIA virtualization is total on this table:** only the VISIBLE rows of the current page
+  are realized as `DataItem`s (~10 in the default layout — probed 2026-10-20, TC016).
+  Never assert page size by counting realized rows; page-size correctness rides on the
+  `Page k of n` readout math, while `SignalTable.ids()` (realized ID column, stride 7,
+  header excluded) cross-checks the realized window as an ordered slice of the CSV export.
+  Small-page realized-row counting beyond `> 0` is NOT valid E2E either.
 - **Combos select via popup keyboard type-ahead** (click combo to open the popup, OS-level
   type-ahead + Enter via `drivers/keyboard.py`; zero WAD calls while the popup is open).
   Popup items share Names with table cells, so element-click matching is ambiguous; closed-
@@ -91,6 +96,10 @@ C++ toolchain paths are absolute defaults in `scripts/build.ps1` (overridable vi
   launched outside a shell with Qt on PATH — exactly how WinAppDriver launches it.
 - **Single source of domain truth** is `app/src/db.cpp` (`kMap` + operator/tech tables). UI and
   `db_test` both derive from it; never duplicate province/city literals elsewhere.
+  `queryFilters` orders by `ORDER BY province, id` (spec 2026-10-20): province groups in
+  alphabetical blocks, id-ascending within — a total order the pager slices and the CSV
+  export mirrors. Pagination windows are defined against THIS order; don't change it
+  without re-pinning TC016/TC017.
 - **Seeder determinism:** fixed `std::mt19937(20241019)`, 10080 rows over 7 days when the
   `cells` table is absent. Changing seed values invalidates committed `database/signaltracker.db` — regenerate
   via `app_dbgen` (`& app\build-mingw\app_dbgen.exe database\signaltracker.db`).

@@ -102,9 +102,10 @@ Technology, Signal Strength, Timestamp), and a bar chart of **average signal qua
 (0–100 %)** grouped by operator or technology — quality is `(avg dBm + 120) / 0.7`, with the
 dBm equivalent recoverable from the CSV export and each bar carrying a readable value label.
 Export writes the current view to `reports/export/export_<timestamp>.csv` and shows the path
-in the status bar, which also always states `Showing N rows` (the FULL query size — the table
-widget displays at most the first 200 rows so the UIA tree stays automation-fast; a future
-pagination can build on that cap).
+in the status bar, which also always states `Showing N rows` (the FULL query size). The table
+is **paginated**: a page-size selector (50/100/200/1000, default 200), Prev/Next buttons with
+edge disabling, and a `Page k of n` readout — every re-query and page-size change returns to
+page 1, and one page keeps the UIA tree automation-fast.
 
 **Dashboard**: KPI readouts (average quality, cell count, best/worst operator), a 7-day
 quality trend, and the weakest-cells list. **Reports**: group summary with CSV export and a
@@ -120,14 +121,17 @@ accounts (removing `admin` is refused by the app).
   readouts mirror their DISPLAYED text in `accessibleName` (the only readable surface WAD
   offers).
 
-## The 15 E2E tests
+## The 17 E2E tests
 
 `TC001` launch + register-first login · `TC002` province filter · `TC003` city filter
 (cascade, Fars→Shiraz) · `TC004` technology filter · `TC005` operator filter · `TC006`
 combined filters · `TC007` reset · `TC008` refresh row-count equality · `TC009` export CSV ·
 `TC010` chart visibility · `TC011` register (fresh/duplicate/empty) · `TC012` login
 (failure copies + success) · `TC013` logout returns to the gate · `TC014` dashboard KPIs /
-trend / weakest cells · `TC015` users admin (remove user, admin guard).
+trend / weakest cells · `TC015` users admin (remove user, admin guard) · `TC016`
+pagination (page windows cross-checked against the CSV export, page-size selector) ·
+`TC017` row-id DSL (`should_contain_row` / `should_not_contain_row` over the realized ID
+column).
 Catalog with preconditions/steps/expected results: `docs/test-cases/`. Failures attach a
 screenshot to the Allure report.
 
