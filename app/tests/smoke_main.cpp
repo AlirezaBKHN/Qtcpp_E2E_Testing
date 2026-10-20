@@ -24,6 +24,7 @@
 class SmokeMain : public QObject {
     Q_OBJECT
 private slots:
+    void signinDialogEnsuresDomainDb();
     void mandatoryIdentifiersPresent();
     void chartShowsValueLabelsAndData();
     void signinGateBlocksMainWindow();
@@ -35,10 +36,44 @@ private slots:
 };
 
 static const char* kIds[] = {
+    "filterSection", "headerSection",
     "provinceCombo", "cityCombo", "technologyCombo", "operatorCombo",
     "searchButton", "refreshButton", "resetButton", "exportButton",
     "signalTable", "signalChart", "chartGroupBy"
 };
+
+// The readout-contract + gate regression: the sign-in dialog must ensure
+// the domain DB on its own (production shows it before any MainWindow, and
+// main.cpp inits nothing itself - probed via UIA: without this the default
+// connection is absent at first paint, so EVERY login answers "Unknown
+// username." and register always fails with "Username already exists.").
+// This slot must stay the FIRST slot: it requires a bare default-connection
+// state, which later MainWindow-constructing slots would have replaced.
+void SmokeMain::signinDialogEnsuresDomainDb()
+{
+    bool acceptedUserSet = false;
+    {
+        SignInDialog d;
+        d.show();
+        QString acceptedUser;
+        QObject::connect(&d, &SignInDialog::acceptedWithUser,
+                         [&acceptedUser, &acceptedUserSet](const QString& user) {
+                             acceptedUser = user; acceptedUserSet = true;
+                         });
+
+        // Seeded credentials authenticate at FIRST paint, without any
+        // window/main.cpp prior setup: the object accepts and closes.
+        d.findChild<QLineEdit*>(QString::fromLatin1("usernameField"))
+            ->setText(QStringLiteral("admin"));
+        d.findChild<QLineEdit*>(QString::fromLatin1("passwordField"))
+            ->setText(QStringLiteral("admin"));
+        d.findChild<QPushButton*>(QString::fromLatin1("loginButton"))->click();
+        QCOMPARE(acceptedUser, QStringLiteral("admin"));
+        QVERIFY(acceptedUserSet);
+        QCOMPARE(d.result(), QDialog::Accepted);
+    }
+    QVERIFY(Db::usernames().size() >= 3); // admin, e2e_user, guest minimum
+}
 
 void SmokeMain::mandatoryIdentifiersPresent()
 {
@@ -107,20 +142,36 @@ void SmokeMain::signinGateBlocksMainWindow()
     QCOMPARE(d.objectName(), QStringLiteral("signinWindow"));
     QCOMPARE(d.accessibleName(), QStringLiteral("signinWindow"));
     const char* ids[] = {"usernameField", "passwordField", "loginButton",
-                         "registerToggle", "signinStatus"};
+                         "registerToggle"};
     for (const char* id : ids) {
         QWidget* found = d.findChild<QWidget*>(QString::fromLatin1(id));
         QVERIFY2(found, qPrintable(QString("missing sign-in child: %1").arg(id)));
         QCOMPARE(QString::fromLatin1(id), found->objectName());
         QCOMPARE(QString::fromLatin1(id), found->accessibleName());
     }
+
+    // Status READOUT contract: objectName keeps the stable id, but the
+    // accessibleName mirrors the displayed TEXT live. Automation reads the
+    // UIA Name (WAD cannot read a QLineEdit's value through any attribute -
+    // probed: Value/HelpText/Text all None), so the Name must be the copy.
+    auto* signin = d.findChild<QLineEdit*>(QString::fromLatin1("signinStatus"));
+    QVERIFY(signin != nullptr);
+    QCOMPARE(signin->objectName(), QStringLiteral("signinStatus"));
+    QVERIFY(signin->isReadOnly());
+    QCOMPARE(signin->accessibleName(), signin->text()); // fresh: ""
+    auto* username = d.findChild<QLineEdit*>(QString::fromLatin1("usernameField"));
+    QVERIFY(username != nullptr);
+    auto* loginButton = d.findChild<QPushButton*>(QString::fromLatin1("loginButton"));
+    QVERIFY(loginButton != nullptr);
+    username->setText(QStringLiteral("ghost_user"));
+    loginButton->click();
+    QCOMPARE(signin->text(), QStringLiteral("Unknown username."));
+    QCOMPARE(signin->accessibleName(), QStringLiteral("Unknown username."));
     // Register mode is NOT active initially: registerButton is present for
     // the in-place toggle but hidden; loginButton is the visible action.
     auto* registerButton = d.findChild<QPushButton*>(QString::fromLatin1("registerButton"));
     QVERIFY(registerButton != nullptr);
     QVERIFY2(!registerButton->isVisible(), "register mode active on a fresh dialog");
-    auto* loginButton = d.findChild<QPushButton*>(QString::fromLatin1("loginButton"));
-    QVERIFY(loginButton != nullptr);
     QVERIFY2(loginButton->isVisible(), "login action must be visible initially");
 }
 
@@ -145,10 +196,11 @@ void SmokeMain::registerModeValidation()
     // Empty password -> pinned copy, no registration attempt.
     auto* registerButtonClicked = registerButton;
     registerButtonClicked->click();
-    auto* status = d.findChild<QLabel*>(QString::fromLatin1("registerStatus"));
+    auto* status = d.findChild<QLineEdit*>(QString::fromLatin1("registerStatus"));
     QVERIFY(status != nullptr);
     QCOMPARE(status->text(), QStringLiteral("Password can not be empty."));
-    QVERIFY(!d.findChild<QLabel*>(QString::fromLatin1("signinStatus"))->isVisible());
+    QCOMPARE(status->accessibleName(), status->text());
+    QVERIFY(!d.findChild<QLineEdit*>(QString::fromLatin1("signinStatus"))->isVisible());
 }
 
 // Tabbed main window + home routing cards + admin gating.
@@ -173,9 +225,11 @@ void SmokeMain::tabsAndHomeCards()
     }
     QCOMPARE(tabs->count(), 5);
 
-    auto* label = admin.findChild<QLabel*>(QString::fromLatin1("currentUserLabel"));
+    auto* label = admin.findChild<QLineEdit*>(QString::fromLatin1("currentUserLabel"));
     QVERIFY(label);
     QCOMPARE(label->text(), QStringLiteral("user: admin"));
+    // Top-bar readout: accessibleName mirrors the text (automation contract).
+    QCOMPARE(label->accessibleName(), label->text());
 
     auto* logout = admin.findChild<QPushButton*>(QString::fromLatin1("logoutButton"));
     QVERIFY(logout);
@@ -208,8 +262,10 @@ void SmokeMain::tabsAndHomeCards()
     QCOMPARE(viewer.findChild<QTabWidget*>(QString::fromLatin1("mainTabs"))->count(), 4);
     QCOMPARE(viewer.findChild<QTabWidget*>(QString::fromLatin1("mainTabs"))
                  ->widget(3)->objectName(), QString::fromLatin1("reportsTab"));
-    QCOMPARE(viewer.findChild<QLabel*>(QString::fromLatin1("currentUserLabel"))->text(),
+    QCOMPARE(viewer.findChild<QLineEdit*>(QString::fromLatin1("currentUserLabel"))->text(),
              QStringLiteral("user: guest"));
+    QCOMPARE(viewer.findChild<QLineEdit*>(QString::fromLatin1("currentUserLabel"))
+                 ->accessibleName(), QStringLiteral("user: guest"));
 }
 
 // Users tab: sorted usernames, remove only for admin, admin self-removal guard.
@@ -288,10 +344,10 @@ void SmokeMain::dashboardContract()
     QCOMPARE(axis->format(), QStringLiteral("yyyy-MM-dd"));
 
     // KPI values are the Db aggregates, not recomputed UI math.
-    auto* kpiAvgQuality = admin.findChild<QLabel*>(QString::fromLatin1("kpiAvgQuality"));
-    auto* kpiCells = admin.findChild<QLabel*>(QString::fromLatin1("kpiCells"));
-    auto* kpiBest = admin.findChild<QLabel*>(QString::fromLatin1("kpiBestOperator"));
-    auto* kpiWorst = admin.findChild<QLabel*>(QString::fromLatin1("kpiWorstOperator"));
+    auto* kpiAvgQuality = admin.findChild<QLineEdit*>(QString::fromLatin1("kpiAvgQuality"));
+    auto* kpiCells = admin.findChild<QLineEdit*>(QString::fromLatin1("kpiCells"));
+    auto* kpiBest = admin.findChild<QLineEdit*>(QString::fromLatin1("kpiBestOperator"));
+    auto* kpiWorst = admin.findChild<QLineEdit*>(QString::fromLatin1("kpiWorstOperator"));
     QVERIFY(kpiAvgQuality && kpiCells && kpiBest && kpiWorst);
     QCOMPARE(kpiAvgQuality->text(),
              QString::number(Db::networkQuality(), 'f', 1) + QStringLiteral("%"));
@@ -313,6 +369,11 @@ void SmokeMain::dashboardContract()
     }
     QCOMPARE(kpiBest->text(), best);
     QCOMPARE(kpiWorst->text(), worst);
+    // KPI readouts mirror their text in the accessibleName (automation).
+    QCOMPARE(kpiAvgQuality->accessibleName(), kpiAvgQuality->text());
+    QCOMPARE(kpiCells->accessibleName(), kpiCells->text());
+    QCOMPARE(kpiBest->accessibleName(), kpiBest->text());
+    QCOMPARE(kpiWorst->accessibleName(), kpiWorst->text());
 
     auto* worstList =
         admin.findChild<QTableWidget*>(QString::fromLatin1("worstCellsList"));

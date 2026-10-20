@@ -32,8 +32,8 @@ private:
     class QPushButton* loginButton = nullptr;
     class QPushButton* registerButton = nullptr;
     class QPushButton* registerToggle = nullptr;
-    class QLabel* signinStatus = nullptr;
-    class QLabel* registerStatus = nullptr;
+    class QLineEdit* signinStatus = nullptr;
+    class QLineEdit* registerStatus = nullptr;
     bool registerMode = false;
     QString user_;
 };

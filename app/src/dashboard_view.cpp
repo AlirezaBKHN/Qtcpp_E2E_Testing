@@ -9,6 +9,7 @@
 #include <QGridLayout>
 #include <QHeaderView>
 #include <QLabel>
+#include <QLineEdit>
 #include <QVBoxLayout>
 
 #include "db.h"
@@ -22,14 +23,29 @@ QWidget* makeStable(QWidget* widget, const char* id)
     return widget;
 }
 
-QLabel* kpiValue(QWidget* parent, QVBoxLayout* layout, const char* caption,
-                 const char* id)
+QLineEdit* kpiValue(QWidget* parent, QVBoxLayout* layout, const char* caption,
+                    const char* id)
 {
     auto* title = new QLabel(QObject::tr(caption), parent);
-    auto* value = qobject_cast<QLabel*>(makeStable(new QLabel(parent), id));
+    auto* field = new QLineEdit(parent);
+    field->setReadOnly(true);
+    field->setFrame(false);
+    // Readout: objectName (== AutomationId) keeps the stable id; the
+    // accessibleName mirrors the displayed text (read via UIA Name) and is
+    // maintained by applyKpi below - never makeStable() here.
+    field->setObjectName(QString::fromLatin1(id));
+    auto* value = qobject_cast<QLineEdit*>(field);
     layout->addWidget(title);
     layout->addWidget(value);
     return value;
+}
+
+// Every KPI write funnels through here: automation reads the UIA Name
+// (== accessibleName) because no attribute key can read a QLineEdit's value.
+void applyKpi(QLineEdit* readout, const QString& text)
+{
+    readout->setText(text);
+    readout->setAccessibleName(text);
 }
 
 } // namespace
@@ -71,6 +87,11 @@ DashboardView::DashboardView(QWidget* parent)
     chart->addAxis(timeAxis, Qt::AlignBottom);
     chart->addAxis(qualityAxis, Qt::AlignLeft);
 
+    // Plain caption above the chart; no accessibleName override so WAD
+    // exposes its TEXT as the UIA Name (readable by the E2E stack).
+    trendCaption = new QLabel(this);
+    trendCaption->setObjectName(QStringLiteral("trendCaption"));
+
     trendChart = new QChartView(chart, this);
     makeStable(trendChart, "trendChart");
     trendChart->setRenderHint(QPainter::Antialiasing);
@@ -84,9 +105,18 @@ DashboardView::DashboardView(QWidget* parent)
     worstCellsList->setSelectionBehavior(QAbstractItemView::SelectRows);
     worstCellsList->setEditTriggers(QAbstractItemView::NoEditTriggers);
 
+    // Plain caption above the weakest-cells table (Name = its text, no
+    // accessibleName override) carrying the row count for the E2E stack -
+    // counting UIA DataItems fails on virtualized tables (repo quirk).
+    // The distinctive prefix keeps it unique against network status text.
+    worstCaption = new QLabel(this);
+    worstCaption->setObjectName(QStringLiteral("worstCaption"));
+
     auto* layout = new QVBoxLayout(this);
     layout->addLayout(kpiRow);
+    layout->addWidget(trendCaption);
     layout->addWidget(trendChart, 1);
+    layout->addWidget(worstCaption);
     layout->addWidget(worstCellsList, 1);
 
     refresh();
@@ -94,29 +124,33 @@ DashboardView::DashboardView(QWidget* parent)
 
 void DashboardView::refresh()
 {
-    kpiAvgQuality->setText(QString::number(Db::networkQuality(), 'f', 1)
-                           + QStringLiteral("%"));
-    kpiCells->setText(QString::number(Db::cellCount()) + QStringLiteral(" cells"));
+    applyKpi(kpiAvgQuality, QString::number(Db::networkQuality(), 'f', 1)
+                                 + QStringLiteral("%"));
+    applyKpi(kpiCells,
+             QString::number(Db::cellCount()) + QStringLiteral(" cells"));
 
     // Best/worst operator come from the shared aggregate; ties keep the
     // first label in Db's order.
+    applyKpi(kpiBestOperator, QString());
+    applyKpi(kpiWorstOperator, QString());
     const auto byOperator =
         Db::avgBy(QStringLiteral("operator"), QString(), QString(), QString(), QString());
     double bestV = -1e300, worstV = 1e300;
     for (const auto& point : byOperator) {
         if (kpiBestOperator->text() == QString() || point.second > bestV) {
             bestV = point.second;
-            kpiBestOperator->setText(point.first);
+            applyKpi(kpiBestOperator, point.first);
         }
         if (kpiWorstOperator->text() == QString() || point.second < worstV) {
             worstV = point.second;
-            kpiWorstOperator->setText(point.first);
+            applyKpi(kpiWorstOperator, point.first);
         }
     }
 
     auto* chart = trendChart->chart();
     chart->removeAllSeries();
     const auto trend = Db::dailyQuality(QString(), QString());
+    trendCaption->setText(tr("Daily quality trend - %1 points").arg(trend.size()));
     auto* series = new QLineSeries;
     for (const auto& point : trend) {
         const QDateTime day = QDateTime::fromString(point.first, Qt::ISODate);
@@ -135,6 +169,8 @@ void DashboardView::refresh()
     series->attachAxis(qualityAxis);
 
     const auto worst = Db::worstCells(8);
+    worstCaption->setText(
+        tr("Weakest cells - %1 rows").arg(worst.size()));
     worstCellsList->setRowCount(0);
     for (const auto& row : worst) {
         const int r = worstCellsList->rowCount();

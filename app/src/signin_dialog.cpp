@@ -20,20 +20,55 @@ QWidget* makeStable(QWidget* widget, const char* id)
     return widget;
 }
 
+// READOUT dictation: a read-only, frameless QLineEdit whose objectName (and
+// therefore UIA AutomationId) keeps the stable id, while the accessibleName
+// mirrors the DISPLAYED TEXT. Probed live (Appium/WAD): no attribute key
+// (Value/HelpText/Text/...) can ever read a QLineEdit's content, but
+// get_attribute("Name") always returns the accessibleName - so the only
+// readable surface for arbitrary readout copy is the Name itself.
+QLineEdit* makeStatusReadout(QWidget* parent, const char* id)
+{
+    auto* field = new QLineEdit(parent);
+    field->setReadOnly(true);
+    field->setFrame(false);
+    field->setObjectName(QString::fromLatin1(id));
+    field->setAccessibleName(QString());
+    return field;
+}
+
+// Every write to a readout MUST funnel through here: the automation stack
+// reads the status copy through the UIA Name (== accessibleName).
+void setReadoutText(QLineEdit* readout, const QString& text)
+{
+    readout->setText(text);
+    readout->setAccessibleName(text);
+}
+
 // Pinned copy (plan Task 3): these strings are part of the automation
-// contract and must not drift.
+// contract and must not drift. The register-success copy carries a REAL
+// em dash: a char[] with \xE2\x80\x94 bytes fed through QString::fromLatin1
+// produced a broken 'â\x80\x94' in the UIA Name the automation stack
+// reads, so this one is a QString constant (single U+2014 code point).
 constexpr char kWrongPassword[] = "Wrong password.";
 constexpr char kUnknownUsername[] = "Unknown username.";
 constexpr char kUsernameExists[] = "Username already exists.";
 constexpr char kPasswordEmpty[] = "Password can not be empty.";
 constexpr char kUsernameEmpty[] = "Username can not be empty.";
-constexpr char kRegistered[] = "Registered \xE2\x80\x94 log in."; // "Registered — log in."
+const QString kRegistered = QStringLiteral("Registered \u2014 log in.");
 
 } // namespace
 
 SignInDialog::SignInDialog(QWidget* parent)
     : QDialog(parent)
 {
+    // The sign-in dialog IS the first screen: production shows it before
+    // any MainWindow exists (probed: without this the default DB
+    // connection is absent at first paint, so every login answers "Unknown
+    // username." and register always reports "Username already exists.").
+    // Ensuring here makes the dialog self-sufficient; Db::init's same-path
+    // guard keeps repeat calls idempotent.
+    Db::init(Db::defaultDatabasePath());
+
     setWindowTitle(tr("Sign in - Iran Signal Tracker"));
     makeStable(this, "signinWindow");
 
@@ -53,8 +88,8 @@ SignInDialog::SignInDialog(QWidget* parent)
     auto* toggleBtn = new QPushButton(tr("Create account"), this);
     registerToggle = qobject_cast<QPushButton*>(makeStable(toggleBtn, "registerToggle"));
 
-    signinStatus = qobject_cast<QLabel*>(makeStable(new QLabel(this), "signinStatus"));
-    registerStatus = qobject_cast<QLabel*>(makeStable(new QLabel(this), "registerStatus"));
+    signinStatus = makeStatusReadout(this, "signinStatus");
+    registerStatus = makeStatusReadout(this, "registerStatus");
 
     auto* form = new QFormLayout;
     form->addRow(userLabel, usernameField);
@@ -89,7 +124,7 @@ void SignInDialog::showLoginMode()
     registerButton->setVisible(false);
     registerStatus->setVisible(false);
     registerToggle->setText(tr("Create account"));
-    signinStatus->clear();
+    setReadoutText(signinStatus, QString());
     usernameField->clear();
     passwordField->clear();
 }
@@ -106,7 +141,7 @@ void SignInDialog::onRegisterToggle()
     registerButton->setVisible(true);
     registerStatus->setVisible(true);
     registerToggle->setText(tr("Back to log in"));
-    registerStatus->clear();
+    setReadoutText(registerStatus, QString());
     usernameField->clear();
     passwordField->clear();
 }
@@ -117,11 +152,11 @@ void SignInDialog::onLogin()
     const QString password = passwordField->text();
 
     if (!Db::usernames().contains(username)) {
-        signinStatus->setText(QString::fromLatin1(kUnknownUsername));
+        setReadoutText(signinStatus, QString::fromLatin1(kUnknownUsername));
         return;
     }
     if (!Db::authUser(username, password)) {
-        signinStatus->setText(QString::fromLatin1(kWrongPassword));
+        setReadoutText(signinStatus, QString::fromLatin1(kWrongPassword));
         return;
     }
     user_ = username;
@@ -135,19 +170,27 @@ void SignInDialog::onRegister()
     const QString password = passwordField->text();
 
     if (username.isEmpty()) {
-        registerStatus->setText(QString::fromLatin1(kUsernameEmpty));
+        setReadoutText(registerStatus, QString::fromLatin1(kUsernameEmpty));
         return;
     }
     if (password.isEmpty()) {
-        registerStatus->setText(QString::fromLatin1(kPasswordEmpty));
+        setReadoutText(registerStatus, QString::fromLatin1(kPasswordEmpty));
         return;
     }
     if (!Db::registerUser(username, password)) {
-        registerStatus->setText(QString::fromLatin1(kUsernameExists));
+        setReadoutText(registerStatus, QString::fromLatin1(kUsernameExists));
         return;
     }
-    // Success: stay in the dialog (owner ruling: register then log in).
-    registerStatus->setText(QString::fromLatin1(kRegistered));
+    // Success: register-first UX - the dialog switches back to LOGIN mode
+    // in place with the pinned copy visible there (fields cleared; the user
+    // then logs in). No auto-login.
+    registerMode = false;
+    loginButton->setVisible(true);
+    signinStatus->setVisible(true);
+    registerButton->setVisible(false);
+    registerStatus->setVisible(false);
+    registerToggle->setText(tr("Create account"));
+    setReadoutText(signinStatus, kRegistered);
     usernameField->clear();
     passwordField->clear();
 }

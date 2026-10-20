@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QComboBox>
+#include <QLineEdit>
 #include <QMainWindow>
 #include <QPushButton>
 #include <QStatusBar>
@@ -49,6 +50,7 @@ private:
 
     QTableWidget* signalTable = nullptr;
     QChartView* signalChart = nullptr;
+    QLineEdit* currentUserLabel = nullptr; // readout (value "user: <name>")
     QTabWidget* mainTabs = nullptr;
 
     QBarCategoryAxis* axisX = nullptr;

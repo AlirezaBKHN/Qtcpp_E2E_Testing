@@ -1,5 +1,6 @@
 #include "db.h"
 
+#include <QCoreApplication>
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
@@ -140,12 +141,32 @@ bool Db::isProvince(const QString& province)
     return provinces().contains(province);
 }
 
+QString Db::defaultDatabasePath()
+{
+    return QDir(QCoreApplication::applicationDirPath())
+        .absoluteFilePath(QStringLiteral("../../database/signaltracker.db"));
+}
+
 bool Db::init(const QString& dbPath)
 {
-    QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"));
-    db.setDatabaseName(dbPath);
-    if (!db.open())
-        return false;
+    // Open/ensure the store exactly once per (path). The sign-in dialog
+    // ensures the DB at first paint; MainWindow re-asks with the canonical
+    // path - the same-path guard keeps that an idempotent no-op instead of
+    // a duplicate-connection replacement (data loss risk is also gone: the
+    // seeds INSERT OR IGNORE, but a replaced connection is a hidden
+    // transaction boundary). A DIFFERENT path still replaces the
+    // connection: tests rely on that for scratch databases.
+    QSqlDatabase db = QSqlDatabase::database();
+    const QString wantPath = QFileInfo(dbPath).absoluteFilePath();
+    const QString openPath = db.isValid() && db.isOpen()
+                                 ? QFileInfo(db.databaseName()).absoluteFilePath()
+                                 : QString();
+    if (wantPath != openPath) {
+        db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"));
+        db.setDatabaseName(dbPath);
+        if (!db.open())
+            return false;
+    }
 
     if (!tableExists(db)) {
         QSqlQuery create(db);

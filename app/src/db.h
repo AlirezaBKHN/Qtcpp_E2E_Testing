@@ -12,8 +12,16 @@ using FilterBindings = QVector<QVariantList>;
 class Db
 {
 public:
-    // Opens (creating + seeding if absent) signaltracker.db.
+    // Opens (creating + seeding if absent) signaltracker.db. Calling with
+    // the path the default connection is already open on is an idempotent
+    // no-op (the sign-in dialog ensures the store at first paint; the main
+    // window re-asks with the canonical path). A different path replaces
+    // the connection (scratch-db test isolation).
     static bool init(const QString& dbPath);
+
+    // The canonical DB path for the deployed app layout
+    // (<exeDir>/../../database/signaltracker.db).
+    static QString defaultDatabasePath();
 
     // Stable domain map; single source of truth for the UI and tests.
     static QStringList provinces();

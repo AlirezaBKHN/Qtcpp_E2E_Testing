@@ -17,6 +17,7 @@
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QSplitter>
 #include <QTabWidget>
@@ -69,10 +70,12 @@ MainWindow::MainWindow(const QString& user, QWidget* parent)
     setWindowTitle(QString::fromLatin1(kTitle));
     resize(1100, 700);
 
-    // Populate domain data from the single source of truth.
-    const QString dbPath = QDir(QCoreApplication::applicationDirPath())
-                               .absoluteFilePath(QStringLiteral("../../database/signaltracker.db"));
-    Db::init(dbPath);
+    // Populate domain data from the single source of truth. The sign-in
+    // dialog already ensured the canonical store; the same-path guard
+    // makes this an idempotent no-op in production, while smoke slots that
+    // construct a MainWindow first (or after the users-scratch swap) get
+    // the correct connection established here.
+    Db::init(Db::defaultDatabasePath());
 
     // -- Filter section -----------------------------------------------------
     provinceCombo = makeCombo(this, "provinceCombo", Db::provinces());
@@ -162,10 +165,17 @@ MainWindow::MainWindow(const QString& user, QWidget* parent)
     // elided to "…" (screenshot evidence). 380/260 keeps the plot readable.
     splitter->setSizes({380, 260});
 
-    // Top bar: current-user readout + logout.
-    auto* currentUserLabel =
-        qobject_cast<QLabel*>(makeStable(new QLabel(this), "currentUserLabel"));
-    currentUserLabel->setText(QStringLiteral("user: ") + currentUser_);
+    // Top bar: current-user readout + logout. Readout: objectName (==
+    // AutomationId) keeps the stable id; accessibleName mirrors the text
+    // (automation reads the UIA Name).
+    auto* userReadout = new QLineEdit(this);
+    userReadout->setReadOnly(true);
+    userReadout->setFrame(false);
+    userReadout->setObjectName(QStringLiteral("currentUserLabel"));
+    currentUserLabel = qobject_cast<QLineEdit*>(userReadout);
+    const QString userText = QStringLiteral("user: ") + currentUser_;
+    currentUserLabel->setText(userText);
+    currentUserLabel->setAccessibleName(userText);
     auto* logoutButton =
         qobject_cast<QPushButton*>(makeStable(new QPushButton(tr("Log out"), this),
                                               "logoutButton"));
@@ -179,7 +189,15 @@ MainWindow::MainWindow(const QString& user, QWidget* parent)
     // -- Network Data page: the original central layout, verbatim.
     QWidget* networkPage = makeStable(new QWidget(this), "networkTab");
     auto* networkLayout = new QVBoxLayout(networkPage);
-    networkLayout->addLayout(filterRow);
+    // Named E2E SECTION (transparent container, no visual change): the
+    // automation scopes its finds to this SMALL UIA subtree instead of the
+    // window root - the root walk carries the 10,080-row table (probed
+    // 2026-10-20: scoped find 0.02s vs 11-38s from the root).
+    auto* filterSection = makeStable(new QWidget(this), "filterSection");
+    auto* filterSectionLayout = new QHBoxLayout(filterSection);
+    filterSectionLayout->setContentsMargins(0, 0, 0, 0);
+    filterSectionLayout->addLayout(filterRow);
+    networkLayout->addWidget(filterSection);
     networkLayout->addWidget(splitter, 1);
 
     // Dashboard/Reports arrive in Tasks 5/6; placeholders pin the tab order
@@ -236,7 +254,13 @@ MainWindow::MainWindow(const QString& user, QWidget* parent)
 
     auto* central = new QWidget(this);
     auto* centralLayout = new QVBoxLayout(central);
-    centralLayout->addLayout(topBar);
+    // Named E2E SECTION for the top bar (see filterSection note): the
+    // automation's header scope (current-user readout + logout button).
+    auto* headerSection = makeStable(new QWidget(this), "headerSection");
+    auto* headerLayout = new QHBoxLayout(headerSection);
+    headerLayout->setContentsMargins(0, 0, 0, 0);
+    headerLayout->addLayout(topBar);
+    centralLayout->addWidget(headerSection);
     centralLayout->addWidget(mainTabs, 1);
     setCentralWidget(central);
 
