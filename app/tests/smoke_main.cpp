@@ -233,10 +233,16 @@ void SmokeMain::registerSuccessReturnsToLoginScratch()
 {
     const QString scratch = QStringLiteral("smoke_users_scratch.db");
     QFile::remove(scratch);
-    QVERIFY(Db::init(scratch));
 
+    // SignInDialog's ctor ensures the DEFAULT store (committed DB). It must
+    // run BEFORE the connection is pointed at the scratch - otherwise it
+    // silently re-points the default connection away from the scratch and
+    // the register INSERT below lands in the committed store (observed:
+    // smoke_reg_success leaked into database/signaltracker.db, and every
+    // later run failed with "Username already exists.").
     SignInDialog d;
     d.show();
+    QVERIFY(Db::init(scratch));
     auto* toggle = d.findChild<QPushButton*>(QString::fromLatin1("registerToggle"));
     QVERIFY(toggle != nullptr);
     toggle->click();
@@ -263,6 +269,11 @@ void SmokeMain::registerSuccessReturnsToLoginScratch()
     QCOMPARE(username->text(), QString());
     QCOMPARE(password->text(), QString());
 
+    // Re-point at the default store BEFORE removing the scratch: the open
+    // connection holds the file locked on Windows, so the removal would
+    // fail silently and a leftover scratch would leak into later slots
+    // (Db::init's same-path guard would then treat it as already set up).
+    Db::init(Db::defaultDatabasePath());
     QFile::remove(scratch);
 }
 
