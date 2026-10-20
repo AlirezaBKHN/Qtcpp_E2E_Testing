@@ -65,6 +65,38 @@ def find_window(title: str) -> int:
     return ctypes.windll.user32.FindWindowW(None, title)
 
 
+def _timeout_diag(title: str) -> str:
+    """TEMPORARY spike diagnostics (remove once E2E is green on CI): dump
+    the app process + window state when the wait fails, so the pytest log
+    carries the evidence instead of a bare timeout."""
+    lines = [f"app pid={_process.pid if _process else None} "
+             f"alive={_process.poll() is None if _process else None} "
+             f"rc={_process.poll() if _process else None}"]
+    try:
+        hwnd = find_window(title)
+        lines.append(f"FindWindowW retry: {hwnd:#x}" if hwnd
+                     else "FindWindowW retry: still NULL")
+        pid = _process.pid if _process else None
+        hits = []
+
+        @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+        def cb(h, l):
+            p = ctypes.c_uint32()
+            ctypes.windll.user32.GetWindowThreadProcessId(h, ctypes.byref(p))
+            if pid is not None and p.value == pid:
+                b = ctypes.create_unicode_buffer(256)
+                ctypes.windll.user32.GetWindowTextW(h, b, 256)
+                c = ctypes.create_unicode_buffer(256)
+                ctypes.windll.user32.GetClassNameW(h, c, 256)
+                hits.append((hex(h), c.value, b.value))
+            return True
+        ctypes.windll.user32.EnumWindows(cb, 0)
+        lines.append(f"app windows via EnumWindows: {hits}")
+    except Exception as e:  # noqa: BLE001 - diagnostics must never mask
+        lines.append(f"diag error: {e!r}")
+    return "\n".join(lines)
+
+
 def wait_hwnd(title: str, timeout: float = 30.0) -> int:
     """Poll for a top-level window with the exact title; return its HWND."""
     deadline = time.time() + timeout
@@ -73,7 +105,8 @@ def wait_hwnd(title: str, timeout: float = 30.0) -> int:
         if hwnd:
             return hwnd
         time.sleep(0.3)
-    raise RuntimeError(f"window {title!r} not found within {timeout}s")
+    raise RuntimeError(f"window {title!r} not found within {timeout}s\n"
+                       f"{_timeout_diag(title)}")
 
 
 def _ensure_wad_running() -> None:

@@ -112,42 +112,43 @@ jobs:
           }
           if (-not $ok) { throw 'WinAppDriver never answered on 4729' }
 
-      # TEMPORARY SPIKE DIAGNOSTIC (remove once E2E is green): python script
-      # (base64-embedded, YAML-safe) mimicking the factory EXACTLY - Popen +
-      # ctypes FindWindowW from the same process - with a 120s watch budget,
-      # EnumWindows evidence, desktop names, and a WAD on/off comparison.
-      - name: Diagnose app launch (factory-identical python trial)
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force (Join-Path $env:GITHUB_WORKSPACE 'diagnostics') | Out-Null
-          python -c "import base64; exec(base64.b64decode('IiIiUnVubmVyIGRpYWdub3N0aWMgdjMgKHRlbXBvcmFyeSwgc3Bpa2Ugb25seSkuCgpNaW1pY3MgdGhlIGZhY3RvcnkncyBsYXVuY2ggKyB3YWl0IEVYQUNUTFkgKFBvcGVuICsgY3R5cGVzIEZpbmRXaW5kb3dXIGZyb20KdGhlIHNhbWUgcHl0aG9uIHByb2Nlc3MpLCB3aXRoIGEgbG9uZyB3YXRjaCBidWRnZXQsIEVudW1XaW5kb3dzIGV2aWRlbmNlLAphbmQgY2FsbGVyL3dpbmRvdyBkZXNrdG9wIG5hbWVzLiBSdW5zIG9uY2Ugd2l0aCBXQUQgdXAsIG9uY2Ugd2l0aCBXQUQgZG93bgoocmVzdGFydHMgV0FEIGJlZm9yZSByZXR1cm5pbmcgc28gcHl0ZXN0IHN0aWxsIGhhcyBpdHMgc3RhY2spLgoiIiIKaW1wb3J0IGN0eXBlcwppbXBvcnQgY3R5cGVzLndpbnR5cGVzIGFzIHd0CmltcG9ydCBvcwppbXBvcnQgc3VicHJvY2VzcwppbXBvcnQgdGltZQoKdTMyID0gY3R5cGVzLndpbmRsbC51c2VyMzIKazMyID0gY3R5cGVzLndpbmRsbC5rZXJuZWwzMgpUSVRMRSA9ICJTaWduIGluIC0gSXJhbiBTaWduYWwgVHJhY2tlciIKUkVQTyA9IG9zLmVudmlyb25bIkdJVEhVQl9XT1JLU1BBQ0UiXQpFWEUgPSBvcy5wYXRoLmpvaW4oUkVQTywgImFwcCIsICJidWlsZC1taW5ndyIsICJJcmFuU2lnbmFsVHJhY2tlci5leGUiKQpESUFHID0gb3MucGF0aC5qb2luKFJFUE8sICJkaWFnbm9zdGljcyIpCldBRCA9IHIiQzpcUHJvZ3JhbSBGaWxlcyAoeDg2KVxXaW5kb3dzIEFwcGxpY2F0aW9uIERyaXZlclxXaW5BcHBEcml2ZXIuZXhlIgoKCmRlZiBkZXNrdG9wX29mX3RocmVhZCh0aWQpOgogICAgaCA9IHUzMi5HZXRUaHJlYWREZXNrdG9wKHRpZCkKICAgIGlmIG5vdCBoOgogICAgICAgIHJldHVybiBmIkdldFRocmVhZERlc2t0b3AgZXJyIHtjdHlwZXMuR2V0TGFzdEVycm9yKCl9IgogICAgYnVmID0gY3R5cGVzLmNyZWF0ZV91bmljb2RlX2J1ZmZlcigyNTYpCiAgICBpZiBub3QgdTMyLkdldFVzZXJPYmplY3RJbmZvcm1hdGlvblcoaCwgMiwgYnVmLCAyNTYsIE5vbmUpOgogICAgICAgIHJldHVybiBmInJlYWQgZXJyIHtjdHlwZXMuR2V0TGFzdEVycm9yKCl9IgogICAgcmV0dXJuIHJlcHIoYnVmLnZhbHVlKQoKCmRlZiBhcHBfd2luZG93cyhwaWQpOgogICAgcmVzID0gW10KCiAgICBAY3R5cGVzLldJTkZVTkNUWVBFKGN0eXBlcy5jX2Jvb2wsIHd0LkhXTkQsIHd0LkxQQVJBTSkKICAgIGRlZiBjYihoLCBsKToKICAgICAgICBwID0gd3QuRFdPUkQoKQogICAgICAgIHUzMi5HZXRXaW5kb3dUaHJlYWRQcm9jZXNzSWQoaCwgY3R5cGVzLmJ5cmVmKHApKQogICAgICAgIGlmIHAudmFsdWUgPT0gcGlkOgogICAgICAgICAgICBiID0gY3R5cGVzLmNyZWF0ZV91bmljb2RlX2J1ZmZlcigyNTYpCiAgICAgICAgICAgIHUzMi5HZXRXaW5kb3dUZXh0VyhoLCBiLCAyNTYpCiAgICAgICAgICAgIGMgPSBjdHlwZXMuY3JlYXRlX3VuaWNvZGVfYnVmZmVyKDI1NikKICAgICAgICAgICAgdTMyLkdldENsYXNzTmFtZVcoaCwgYywgMjU2KQogICAgICAgICAgICByZXMuYXBwZW5kKChoLCBjLnZhbHVlLCBiLnZhbHVlKSkKICAgICAgICByZXR1cm4gVHJ1ZQoKICAgIHUzMi5FbnVtV2luZG93cyhjYiwgMCkKICAgIHJldHVybiByZXMKCgpkZWYgdG90YWxfd2luZG93cygpOgogICAgbiA9IFswXQoKICAgIEBjdHlwZXMuV0lORlVOQ1RZUEUoY3R5cGVzLmNfYm9vbCwgd3QuSFdORCwgd3QuTFBBUkFNKQogICAgZGVmIGNiKGgsIGwpOgogICAgICAgIG5bMF0gKz0gMQogICAgICAgIHJldHVybiBUcnVlCgogICAgdTMyLkVudW1XaW5kb3dzKGNiLCAwKQogICAgcmV0dXJuIG5bMF0KCgpkZWYgd2FkX2xpc3RlbmluZyhwb3J0PTQ3MjkpOgogICAgaW1wb3J0IHNvY2tldAogICAgdHJ5OgogICAgICAgIHdpdGggc29ja2V0LmNyZWF0ZV9jb25uZWN0aW9uKCgiMTI3LjAuMC4xIiwgcG9ydCksIHRpbWVvdXQ9MSk6CiAgICAgICAgICAgIHJldHVybiBUcnVlCiAgICBleGNlcHQgT1NFcnJvcjoKICAgICAgICByZXR1cm4gRmFsc2UKCgpkZWYgd2F0Y2godGFnLCBidWRnZXQsIGtpbGxfd2FkX2ZpcnN0KToKICAgIHN1YnByb2Nlc3MucnVuKFsidGFza2tpbGwiLCAiL0YiLCAiL0lNIiwgIklyYW5TaWduYWxUcmFja2VyLmV4ZSJdLAogICAgICAgICAgICAgICAgICAgY2FwdHVyZV9vdXRwdXQ9VHJ1ZSkKICAgIGlmIGtpbGxfd2FkX2ZpcnN0OgogICAgICAgIHN1YnByb2Nlc3MucnVuKFsidGFza2tpbGwiLCAiL0YiLCAiL0lNIiwgIldpbkFwcERyaXZlci5leGUiXSwKICAgICAgICAgICAgICAgICAgICAgICBjYXB0dXJlX291dHB1dD1UcnVlKQogICAgICAgIHRpbWUuc2xlZXAoMikKICAgIHAgPSBzdWJwcm9jZXNzLlBvcGVuKFtFWEVdLCBjd2Q9b3MucGF0aC5qb2luKFJFUE8sICJhdXRvbWF0aW9uIikpCiAgICB0MCA9IHRpbWUudGltZSgpCiAgICBod25kID0gMAogICAgd2hpbGUgdGltZS50aW1lKCkgLSB0MCA8IGJ1ZGdldDoKICAgICAgICBod25kID0gdTMyLkZpbmRXaW5kb3dXKE5vbmUsIFRJVExFKQogICAgICAgIGlmIGh3bmQ6CiAgICAgICAgICAgIGJyZWFrCiAgICAgICAgdGltZS5zbGVlcCgxKQogICAgZHQgPSB0aW1lLnRpbWUoKSAtIHQwCiAgICB3aW5zID0gYXBwX3dpbmRvd3MocC5waWQpCiAgICBsaW5lcyA9IFsKICAgICAgICBmIlt7dGFnfV0gRmluZFdpbmRvd1cgYWZ0ZXIge2R0Oi4wZn1zOiAiCiAgICAgICAgZiJ7J0ZPVU5EICUjeCcgJSBod25kIGlmIGh3bmQgZWxzZSAnTk9UIEZPVU5EJ307ICIKICAgICAgICBmInByb2MgYWxpdmU9e3AucG9sbCgpIGlzIE5vbmV9IiwKICAgICAgICBmIlt7dGFnfV0gYXBwIHdpbmRvd3MgdmlhIEVudW1XaW5kb3dzOiAiCiAgICAgICAgZiJ7WyhoZXgoaCksIGMsIHQpIGZvciBoLCBjLCB0IGluIHdpbnNdfSIsCiAgICAgICAgZiJbe3RhZ31dIHRvdGFsIHRvcC1sZXZlbCB3aW5kb3dzIHZpc2libGU6IHt0b3RhbF93aW5kb3dzKCl9IiwKICAgICAgICBmIlt7dGFnfV0gY2FsbGVyIGRlc2t0b3A6IHtkZXNrdG9wX29mX3RocmVhZChrMzIuR2V0Q3VycmVudFRocmVhZElkKCkpfSIsCiAgICBdCiAgICBpZiB3aW5zOgogICAgICAgIHRpZCA9IHUzMi5HZXRXaW5kb3dUaHJlYWRQcm9jZXNzSWQod2luc1swXVswXSwgTm9uZSkKICAgICAgICBsaW5lcy5hcHBlbmQoZiJbe3RhZ31dIHdpbmRvdyBkZXNrdG9wOiB7ZGVza3RvcF9vZl90aHJlYWQodGlkKX0iKQogICAgb3V0ID0gIlxuIi5qb2luKGxpbmVzKQogICAgcHJpbnQob3V0LCBmbHVzaD1UcnVlKQogICAgd2l0aCBvcGVuKG9zLnBhdGguam9pbihESUFHLCAicHl0cmlhbC50eHQiKSwgImEiLCBlbmNvZGluZz0idXRmLTgiKSBhcyBmOgogICAgICAgIGYud3JpdGUob3V0ICsgIlxuIikKICAgIHN1YnByb2Nlc3MucnVuKFsidGFza2tpbGwiLCAiL0YiLCAiL0lNIiwgIklyYW5TaWduYWxUcmFja2VyLmV4ZSJdLAogICAgICAgICAgICAgICAgICAgY2FwdHVyZV9vdXRwdXQ9VHJ1ZSkKCgp3YXRjaCgid2FkLW9uIiwgMTIwLCBraWxsX3dhZF9maXJzdD1GYWxzZSkKd2F0Y2goIndhZC1vZmYiLCA2MCwga2lsbF93YWRfZmlyc3Q9VHJ1ZSkKCiMgUmVzdG9yZSB0aGUgc3RhY2sgcHl0ZXN0IG5lZWRzIChmYWN0b3J5IHdpbGwgYWxzbyBzZWxmLWhlYWwsIGJ1dCB0aGUKIyBjb25mdGVzdCBwb3J0IHByb2JlIGhhcHBlbnMgYmVmb3JlIGFueSBsYXVuY2gpLgppZiBub3Qgd2FkX2xpc3RlbmluZygpOgogICAgc3VicHJvY2Vzcy5Qb3BlbihbV0FELCAiNDcyOSJdLAogICAgICAgICAgICAgICAgICAgICBjcmVhdGlvbmZsYWdzPXN1YnByb2Nlc3MuQ1JFQVRFX05FV19DT05TT0xFKQogICAgZGVhZGxpbmUgPSB0aW1lLnRpbWUoKSArIDMwCiAgICB3aGlsZSB0aW1lLnRpbWUoKSA8IGRlYWRsaW5lIGFuZCBub3Qgd2FkX2xpc3RlbmluZygpOgogICAgICAgIHRpbWUuc2xlZXAoMSkKd2l0aCBvcGVuKG9zLnBhdGguam9pbihESUFHLCAicHl0cmlhbC50eHQiKSwgImEiLCBlbmNvZGluZz0idXRmLTgiKSBhcyBmOgogICAgZi53cml0ZShmIldBRCBsaXN0ZW5pbmcgYWZ0ZXIgZGlhZ25vc3RpY3M6IHt3YWRfbGlzdGVuaW5nKCl9XG4iKQpwcmludCgiV0FEIGxpc3RlbmluZyBhZnRlciBkaWFnbm9zdGljczoiLCB3YWRfbGlzdGVuaW5nKCksIGZsdXNoPVRydWUp').decode())"
-          Add-Type -AssemblyName System.Windows.Forms
-          Add-Type -AssemblyName System.Drawing
-          $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-          $bmp = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
-          $g = [System.Drawing.Graphics]::FromImage($bmp)
-          $g.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
-          $bmp.Save((Join-Path $env:GITHUB_WORKSPACE 'diagnostics\desktop.png'))
-
-      - name: Upload launch diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: desktop-diagnostics
-          path: diagnostics/
-          retention-days: 7
-
       # Per-test fixture isolation (isolate_db) needs no pre-restore: it
       # restores + migrates the mapped fixture before EVERY test.
       # SPIKE MODE (temporary): only 2 tests until the runner-desktop spike
       # is green - TC001 (launch/sign-in) + TC002 (sign-in + first tab).
       # Restore `tests` + the TC019 deselect for the full nightly suite.
+      # The post-pytest capture is diagnostic: the app process from the last
+      # failed attach is usually still alive, so screenshot + window dump in
+      # THAT context is the evidence (factory.wait_hwnd also dumps EnumWindows
+      # into the failure message itself).
       - name: Run E2E suite (TC019 deselected)
         shell: pwsh
         working-directory: automation
         run: |
           $results = Join-Path $env:GITHUB_WORKSPACE 'reports\allure-results'
           python -m pytest tests/test_tc001_launch.py tests/test_tc002_province_filter.py -v --alluredir=$results --deselect tests/test_tc019_demo_failure.py::test_tc019_demo_failure
+          $rc = $LASTEXITCODE
+          $diag = Join-Path $env:GITHUB_WORKSPACE 'diagnostics'
+          New-Item -ItemType Directory -Force $diag | Out-Null
+          Get-Process IranSignalTracker -ErrorAction SilentlyContinue |
+            Select-Object Id, Responding, MainWindowTitle |
+            Out-File "$diag\post-pytest-windows.txt" -Width 300
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+          $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
+          $g = [System.Drawing.Graphics]::FromImage($bmp)
+          $g.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+          $bmp.Save("$diag\post-pytest-desktop.png")
+          exit $rc
+
+      - name: Upload spike diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-diagnostics
+          path: diagnostics/
+          retention-days: 7
 
       # Retry mirrors scripts/run-allure.ps1 (AV-scan EPERM race on Windows).
       - name: Generate Allure report
