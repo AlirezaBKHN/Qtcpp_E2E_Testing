@@ -135,19 +135,16 @@ jobs:
 
       # Per-test fixture isolation (isolate_db) needs no pre-restore: it
       # restores + migrates the mapped fixture before EVERY test.
-      # SPIKE MODE (temporary): only 2 tests until the runner-desktop spike
-      # is green - TC001 (launch/sign-in) + TC002 (sign-in + first tab).
-      # Restore `tests` + the TC019 deselect for the full nightly suite.
-      # The post-pytest capture is diagnostic: the app process from the last
-      # failed attach is usually still alive, so screenshot + window dump in
-      # THAT context is the evidence (factory.wait_hwnd also dumps EnumWindows
-      # into the failure message itself).
+      # The post-pytest capture is temporary spike validation: on failure the
+      # app process from the last attach is usually still alive, so the
+      # screenshot + window dump in THAT context is the evidence
+      # (factory.wait_hwnd also dumps EnumWindows into the failure message).
       - name: Run E2E suite (TC019 deselected)
         shell: pwsh
         working-directory: automation
         run: |
           $results = Join-Path $env:GITHUB_WORKSPACE 'reports\allure-results'
-          python -m pytest tests/test_tc001_launch.py tests/test_tc002_province_filter.py -v --alluredir=$results --deselect tests/test_tc019_demo_failure.py::test_tc019_demo_failure
+          python -m pytest tests -v --alluredir=$results --deselect tests/test_tc019_demo_failure.py::test_tc019_demo_failure
           $rc = $LASTEXITCODE
           $diag = Join-Path $env:GITHUB_WORKSPACE 'diagnostics'
           New-Item -ItemType Directory -Force $diag | Out-Null

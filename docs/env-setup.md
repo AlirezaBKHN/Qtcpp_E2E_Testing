@@ -26,6 +26,8 @@ Stack provisioned 2026-10-19 by the coding agent (see plan Task 1).
 - Python was installed user-scope, no elevation.
 - Smoke results: `WinAppDriver.exe 4729` → LISTENING (verified); WAD requires the port as a CLI arg when non-default.
 - WAD speaks legacy JSONWP (top-level `sessionId`), enough that its own Root session CAN enumerate desktop windows spawned from the agent shell; the Appium windows driver handles protocol conversion for us.
+- **DRIVER_MODE=direct is BROKEN with modern selenium (probed 2026-10-21 on CI):** selenium 4.x sends the W3C capabilities envelope (`{"capabilities": {"alwaysMatch": ...}}`), but WAD 1.2.1 only parses legacy JSONWP (`{"desiredCapabilities": ...}` at top level) — session creation fails with `Bad capabilities. Specify either app or appTopLevelWindow` even though the POST contains the cap. The factory's direct path was only ever validated via the raw-JSONWP probe (`automation/tools/probe_root.py`), which sends the legacy envelope. Appium mode is therefore the only supported driver path; direct mode stays as the documented hidden fallback pending either a selenium JSONWP shim or a WAD update.
+- **CI console quirk (GitHub-hosted runners):** servers started with `Start-Process -RedirectStandardOutput` inherit the step's stdin, which EOFs when the step ends — Appium exits on stdin close and is dead before the next step. Start long-lived servers with a **plain `Start-Process`** (fresh console, own never-EOFing stdin, empirically survives across steps — same mechanism WAD needs for its own console).
 
 ## Ports
 
