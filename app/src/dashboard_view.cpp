@@ -6,10 +6,12 @@
 #include <QtCharts/QValueAxis>
 
 #include <QDateTime>
+#include <QDateEdit>
 #include <QGridLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
+#include <QPushButton>
 #include <QVBoxLayout>
 
 #include "db.h"
@@ -54,6 +56,73 @@ DashboardView::DashboardView(QWidget* parent)
     : QWidget(parent)
 {
     makeStable(this, "dashboardTab");
+
+    // -- Filter section (spec 2026-10-20): the same controls and cascade
+    // behaviour as the network tab's filterSection; filters apply on Search
+    // and Reset restores the unfiltered defaults. Named section so the E2E
+    // finds scope into a small UIA subtree (find-performance architecture).
+    auto* filterSection = makeStable(new QWidget(this), "dashboardFilterSection");
+    auto* filterLayout = new QHBoxLayout(filterSection);
+    filterLayout->setContentsMargins(0, 0, 0, 0);
+
+    auto makeCombo = [](QWidget* parent, const char* id, const QStringList& values) {
+        auto* combo = new QComboBox(parent);
+        combo->setObjectName(QString::fromLatin1(id));
+        combo->setAccessibleName(QString::fromLatin1(id));
+        combo->addItem(QStringLiteral("All"));
+        combo->addItems(values);
+        return combo;
+    };
+    provinceCombo = makeCombo(filterSection, "dashboardProvinceCombo", Db::provinces());
+    cityCombo = makeCombo(filterSection, "dashboardCityCombo", Db::citiesFor(QString()));
+    technologyCombo =
+        makeCombo(filterSection, "dashboardTechnologyCombo", {"2G", "3G", "4G", "5G"});
+    operatorCombo = makeCombo(filterSection, "dashboardOperatorCombo",
+                              {"MCI", "Irancell", "Rightel", "Shatel Mobile"});
+
+    // Date pair defaults to the data era (the full seeded range), so the
+    // default Search equals an unbounded query. Invalid era (empty db)
+    // falls back to a wide-open window. Readout contract: objectName keeps
+    // the stable id; accessibleName mirrors the displayed text.
+    const auto era = Db::dataEra();
+    const QDate defaultFrom = era.first.isValid() ? era.first : QDate(2000, 1, 1);
+    const QDate defaultTo = era.second.isValid() ? era.second : QDate(2100, 1, 1);
+    fromDateEdit = new QDateEdit(defaultFrom, filterSection);
+    fromDateEdit->setObjectName(QStringLiteral("dashboardFromDateEdit"));
+    toDateEdit = new QDateEdit(defaultTo, filterSection);
+    toDateEdit->setObjectName(QStringLiteral("dashboardToDateEdit"));
+    for (QDateEdit* edit : {fromDateEdit, toDateEdit}) {
+        edit->setDisplayFormat(QStringLiteral("yyyy-MM-dd"));
+        edit->setCalendarPopup(false);
+        edit->setAccessibleName(edit->text());
+    }
+    connect(fromDateEdit, &QDateEdit::dateChanged, this, [this](const QDate&) {
+        fromDateEdit->setAccessibleName(fromDateEdit->text());
+    });
+    connect(toDateEdit, &QDateEdit::dateChanged, this, [this](const QDate&) {
+        toDateEdit->setAccessibleName(toDateEdit->text());
+    });
+
+    auto* searchBtn = new QPushButton(tr("Search"), filterSection);
+    searchButton = qobject_cast<QPushButton*>(makeStable(searchBtn, "dashboardSearchButton"));
+    searchButton->setDefault(true);
+    auto* resetBtn = new QPushButton(tr("Reset"), filterSection);
+    resetButton = qobject_cast<QPushButton*>(makeStable(resetBtn, "dashboardResetButton"));
+
+    filterLayout->addWidget(provinceCombo);
+    filterLayout->addWidget(cityCombo);
+    filterLayout->addWidget(technologyCombo);
+    filterLayout->addWidget(operatorCombo);
+    filterLayout->addWidget(fromDateEdit);
+    filterLayout->addWidget(toDateEdit);
+    filterLayout->addWidget(searchButton);
+    filterLayout->addWidget(resetButton);
+    filterLayout->addStretch(1);
+
+    connect(provinceCombo, &QComboBox::currentIndexChanged,
+            this, &DashboardView::onProvinceChanged);
+    connect(searchButton, &QPushButton::clicked, this, &DashboardView::onSearch);
+    connect(resetButton, &QPushButton::clicked, this, &DashboardView::onReset);
 
     auto* kpiRow = new QHBoxLayout;
     auto* avgBox = new QVBoxLayout;
@@ -113,6 +182,7 @@ DashboardView::DashboardView(QWidget* parent)
     worstCaption->setObjectName(QStringLiteral("worstCaption"));
 
     auto* layout = new QVBoxLayout(this);
+    layout->addWidget(filterSection);
     layout->addLayout(kpiRow);
     layout->addWidget(trendCaption);
     layout->addWidget(trendChart, 1);
@@ -122,19 +192,75 @@ DashboardView::DashboardView(QWidget* parent)
     refresh();
 }
 
+QString DashboardView::comboFilter(const QComboBox* combo) const
+{
+    const QString value = combo->currentText();
+    if (value.isEmpty() || value == QLatin1String("All"))
+        return QString();
+    return value;
+}
+
+void DashboardView::onProvinceChanged(int index)
+{
+    Q_UNUSED(index);
+    // Cascade (network-tab behaviour): the city combo repopulates from the
+    // selected province and lands back on All.
+    cityCombo->blockSignals(true);
+    cityCombo->clear();
+    cityCombo->addItem(QStringLiteral("All"));
+    cityCombo->addItems(
+        comboFilter(provinceCombo).isEmpty() ? Db::citiesFor(QString())
+                                             : Db::citiesFor(comboFilter(provinceCombo)));
+    cityCombo->setCurrentIndex(0);
+    cityCombo->blockSignals(false);
+}
+
+void DashboardView::onSearch()
+{
+    refresh();
+}
+
+void DashboardView::onReset()
+{
+    provinceCombo->blockSignals(true);
+    provinceCombo->setCurrentIndex(0);
+    provinceCombo->blockSignals(false);
+    onProvinceChanged(0); // city back to All + full city list
+    technologyCombo->setCurrentIndex(0);
+    operatorCombo->setCurrentIndex(0);
+    const auto era = Db::dataEra();
+    fromDateEdit->setDate(era.first.isValid() ? era.first : QDate(2000, 1, 1));
+    toDateEdit->setDate(era.second.isValid() ? era.second : QDate(2100, 1, 1));
+    refresh();
+}
+
 void DashboardView::refresh()
 {
-    applyKpi(kpiAvgQuality, QString::number(Db::networkQuality(), 'f', 1)
-                                 + QStringLiteral("%"));
+    const QString province = comboFilter(provinceCombo);
+    const QString city = comboFilter(cityCombo);
+    const QString technology = comboFilter(technologyCombo);
+    const QString operatorName = comboFilter(operatorCombo);
+    const QDate from = fromDateEdit->date();
+    const QDate to = toDateEdit->date();
+
+    applyKpi(kpiAvgQuality,
+             QString::number(Db::networkQuality(province, city, technology,
+                                                operatorName, from, to),
+                             'f', 1)
+                 + QStringLiteral("%"));
     applyKpi(kpiCells,
-             QString::number(Db::cellCount()) + QStringLiteral(" cells"));
+             QString::number(Db::queryFilters(province, city, technology,
+                                              operatorName, from, to)
+                                 .size())
+                 + QStringLiteral(" cells"));
 
     // Best/worst operator come from the shared aggregate; ties keep the
-    // first label in Db's order.
+    // first label in Db's order; zero groups leave the readouts empty.
     applyKpi(kpiBestOperator, QString());
     applyKpi(kpiWorstOperator, QString());
     const auto byOperator =
-        Db::avgBy(QStringLiteral("operator"), QString(), QString(), QString(), QString());
+        Db::avgBy(QStringLiteral("operator"), province, city, technology, operatorName,
+                  from, to);
     double bestV = -1e300, worstV = 1e300;
     for (const auto& point : byOperator) {
         if (kpiBestOperator->text() == QString() || point.second > bestV) {
@@ -149,7 +275,7 @@ void DashboardView::refresh()
 
     auto* chart = trendChart->chart();
     chart->removeAllSeries();
-    const auto trend = Db::dailyQuality(QString(), QString());
+    const auto trend = Db::dailyQuality(QString(), QString(), from, to);
     trendCaption->setText(tr("Daily quality trend - %1 points").arg(trend.size()));
     auto* series = new QLineSeries;
     for (const auto& point : trend) {
@@ -168,7 +294,8 @@ void DashboardView::refresh()
     series->attachAxis(timeAxis);
     series->attachAxis(qualityAxis);
 
-    const auto worst = Db::worstCells(8);
+    const auto worst =
+        Db::worstCells(8, province, city, technology, operatorName, from, to);
     worstCaption->setText(
         tr("Weakest cells - %1 rows").arg(worst.size()));
     worstCellsList->setRowCount(0);

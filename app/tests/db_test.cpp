@@ -372,7 +372,9 @@ int main(int argc, char* argv[])
 
         // Unbounded defaults equal the no-arg overloads.
         CHECK(Db::cellCount(QDate(), QDate()) == Db::cellCount());
-        CHECK(Db::networkQuality(QDate(), QDate()) == Db::networkQuality());
+        CHECK(Db::networkQuality(QString(), QString(), QString(), QString(),
+                                 QDate(), QDate())
+              == Db::networkQuality());
         CHECK(Db::avgBy("operator", QString(), QString(), QString(), QString(),
                         QDate(), QDate()).size()
               == Db::avgBy("operator", QString(), QString(), QString(), QString()).size());

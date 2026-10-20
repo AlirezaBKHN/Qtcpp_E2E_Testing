@@ -76,7 +76,13 @@ public:
     // 0..100 quality metric ((avg dBm + 120) / 0.7); every quality number
     // in UI or tests derives through it - never inline the transform.
     static double qualityFrom(double avgDbm);
-    static double networkQuality(const QDate& from = {},
+    // The filtered average quality (0..100 metric): column filters + date
+    // range, all defaulted to unbounded so existing callers are unchanged.
+    static double networkQuality(const QString& province = {},
+                                 const QString& city = {},
+                                 const QString& technology = {},
+                                 const QString& operatorName = {},
+                                 const QDate& from = {},
                                  const QDate& to = {});
     static int cellCount(const QDate& from = {},
                          const QDate& to = {});

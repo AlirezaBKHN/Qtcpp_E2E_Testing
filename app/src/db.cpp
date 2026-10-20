@@ -272,18 +272,38 @@ double Db::qualityFrom(double avgDbm)
     return (avgDbm + 120.0) / 0.7;
 }
 
-double Db::networkQuality(const QDate& from, const QDate& to)
+double Db::networkQuality(const QString& province, const QString& city,
+                          const QString& technology, const QString& operatorName,
+                          const QDate& from, const QDate& to)
 {
     QStringList clauses;
+    if (!province.isEmpty() && province != QLatin1String("All"))
+        clauses << "province = :province";
+    if (!city.isEmpty() && city != QLatin1String("All"))
+        clauses << "city = :city";
+    if (!technology.isEmpty() && technology != QLatin1String("All"))
+        clauses << "technology = :technology";
+    if (!operatorName.isEmpty() && operatorName != QLatin1String("All"))
+        clauses << "operator = :operator";
     appendDateClause(from, to, clauses);
     QString sql = QStringLiteral("SELECT AVG(signal_strength) FROM cells");
     if (!clauses.isEmpty())
         sql += QStringLiteral(" WHERE ") + clauses.join(QStringLiteral(" AND "));
     QSqlQuery q(QSqlDatabase::database());
     q.prepare(sql);
+    if (clauses.contains("province = :province"))
+        q.bindValue(":province", province);
+    if (clauses.contains("city = :city"))
+        q.bindValue(":city", city);
+    if (clauses.contains("technology = :technology"))
+        q.bindValue(":technology", technology);
+    if (clauses.contains("operator = :operator"))
+        q.bindValue(":operator", operatorName);
     bindDates(q, from, to);
     q.exec();
-    if (!q.next())
+    // AVG over zero matching rows comes back NULL (the filtered empty
+    // state): the quality metric is 0.0, never qualityFrom(0)'s 171.4%.
+    if (!q.next() || q.value(0).isNull())
         return 0.0;
     return qualityFrom(q.value(0).toDouble());
 }

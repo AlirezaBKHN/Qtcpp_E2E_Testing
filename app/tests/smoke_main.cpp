@@ -1,5 +1,6 @@
 #include <QApplication>
 #include <QComboBox>
+#include <QDateEdit>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
@@ -554,6 +555,103 @@ void SmokeMain::dashboardContract()
     QVERIFY(worstList);
     QCOMPARE(worstList->rowCount(), 8);
     QVERIFY(worstList->rowCount() >= 1);
+
+    // -- Filter section (spec 2026-10-20): same combo populations as the
+    // network tab, era-defaulted date pair, Search applies, Reset restores.
+    auto* section = admin.findChild<QWidget*>(QString::fromLatin1("dashboardFilterSection"));
+    QVERIFY2(section, "dashboardFilterSection missing");
+    auto* province = admin.findChild<QComboBox*>(QString::fromLatin1("dashboardProvinceCombo"));
+    auto* city = admin.findChild<QComboBox*>(QString::fromLatin1("dashboardCityCombo"));
+    auto* technology = admin.findChild<QComboBox*>(QString::fromLatin1("dashboardTechnologyCombo"));
+    auto* oper = admin.findChild<QComboBox*>(QString::fromLatin1("dashboardOperatorCombo"));
+    QVERIFY(province && city && technology && oper);
+    QCOMPARE(province->itemText(0), QStringLiteral("All"));
+    QStringList provinceItems;
+    for (int i = 1; i < province->count(); ++i)
+        provinceItems << province->itemText(i);
+    QCOMPARE(provinceItems, Db::provinces());
+    QCOMPARE(technology->itemText(0), QStringLiteral("All"));
+    QCOMPARE(oper->itemText(0), QStringLiteral("All"));
+
+    auto* fromEdit = admin.findChild<QDateEdit*>(QString::fromLatin1("dashboardFromDateEdit"));
+    auto* toEdit = admin.findChild<QDateEdit*>(QString::fromLatin1("dashboardToDateEdit"));
+    QVERIFY(fromEdit && toEdit);
+    QVERIFY(!fromEdit->calendarPopup());
+    QCOMPARE(fromEdit->displayFormat(), QStringLiteral("yyyy-MM-dd"));
+    const auto era = Db::dataEra();
+    QCOMPARE(fromEdit->date(), era.first);
+    QCOMPARE(toEdit->date(), era.second);
+    // Readout contract: accessibleName mirrors the displayed text.
+    QCOMPARE(fromEdit->accessibleName(), fromEdit->text());
+    QCOMPARE(toEdit->accessibleName(), toEdit->text());
+
+    auto* searchBtn = admin.findChild<QPushButton*>(QString::fromLatin1("dashboardSearchButton"));
+    auto* resetBtn = admin.findChild<QPushButton*>(QString::fromLatin1("dashboardResetButton"));
+    QVERIFY(searchBtn && resetBtn);
+
+    // Search with a province filter narrows every widget to the filtered
+    // aggregates (all values are Db calls under the same filters).
+    province->setCurrentText(QStringLiteral("Fars"));
+    searchBtn->click();
+    QTest::qWait(30);
+    const int farsRows =
+        Db::queryFilters(QStringLiteral("Fars"), QString(), QString(), QString()).size();
+    QVERIFY(farsRows > 0 && farsRows < Db::cellCount());
+    QCOMPARE(kpiCells->text(), QString::number(farsRows) + QStringLiteral(" cells"));
+    QCOMPARE(kpiCells->accessibleName(), kpiCells->text());
+    {
+        QSqlQuery avg(QStringLiteral(
+            "SELECT AVG(signal_strength) FROM cells WHERE province = 'Fars'"));
+        avg.next();
+        QCOMPARE(kpiAvgQuality->text(),
+                 QString::number(Db::qualityFrom(avg.value(0).toDouble()), 'f', 1)
+                     + QStringLiteral("%"));
+    }
+    auto* trendCaption = admin.findChild<QLabel*>(QString::fromLatin1("trendCaption"));
+    QVERIFY(trendCaption);
+    {
+        const auto trend = Db::dailyQuality(QStringLiteral("province"), QStringLiteral("Fars"));
+        QVERIFY(trend.size() >= 1 && trend.size() <= 7);
+        QCOMPARE(trendCaption->text(),
+                 QStringLiteral("Daily quality trend - %1 points").arg(trend.size()));
+    }
+    auto* worstCaption = admin.findChild<QLabel*>(QString::fromLatin1("worstCaption"));
+    QVERIFY(worstCaption);
+    {
+        const auto worst = Db::worstCells(8, QStringLiteral("Fars"));
+        QCOMPARE(worstCaption->text(),
+                 QStringLiteral("Weakest cells - %1 rows").arg(worst.size()));
+    }
+    // City cascade: repopulated from the selected province, back to All.
+    QStringList cityItems;
+    for (int i = 0; i < city->count(); ++i)
+        cityItems << city->itemText(i);
+    QVERIFY(cityItems.first() == QStringLiteral("All"));
+    QVERIFY(cityItems.contains(QStringLiteral("Shiraz")));
+
+    // Out-of-era dates: the pinned empty state - zero groups leave the
+    // best/worst operator readouts EMPTY, never stale or garbage.
+    fromEdit->setDate(QDate(2020, 1, 1));
+    toEdit->setDate(QDate(2020, 1, 2));
+    searchBtn->click();
+    QTest::qWait(30);
+    QCOMPARE(kpiCells->text(), QStringLiteral("0 cells"));
+    QCOMPARE(kpiAvgQuality->text(), QStringLiteral("0.0%"));
+    QCOMPARE(kpiBest->text(), QString());
+    QCOMPARE(kpiWorst->text(), QString());
+    QCOMPARE(kpiBest->accessibleName(), QString());
+    QCOMPARE(trendCaption->text(), QStringLiteral("Daily quality trend - 0 points"));
+    QCOMPARE(worstCaption->text(), QStringLiteral("Weakest cells - 0 rows"));
+    QCOMPARE(worstList->rowCount(), 0);
+
+    // Reset restores All + era defaults and re-queries.
+    resetBtn->click();
+    QTest::qWait(30);
+    QCOMPARE(province->currentText(), QStringLiteral("All"));
+    QCOMPARE(fromEdit->date(), era.first);
+    QCOMPARE(toEdit->date(), era.second);
+    QCOMPARE(kpiCells->text(),
+             QString::number(Db::cellCount()) + QStringLiteral(" cells"));
 }
 
 // Reports: group summary table + per-label drill-down + CSV export.
