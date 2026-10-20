@@ -86,47 +86,6 @@ jobs:
         shell: pwsh
         run: powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 
-      # TEMPORARY SPIKE DIAGNOSTIC (remove once E2E is green): launches the
-      # app standalone on the runner desktop and captures what actually
-      # happens - process alive? window title? crash event? desktop look?
-      - name: Diagnose app launch on runner desktop
-        shell: pwsh
-        run: |
-          $diag = Join-Path $env:GITHUB_WORKSPACE 'diagnostics'
-          New-Item -ItemType Directory -Force $diag | Out-Null
-          Add-Type -AssemblyName System.Windows.Forms
-          Add-Type -AssemblyName System.Drawing
-          $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-          "screen: $($bounds.Width)x$($bounds.Height)" | Out-File "$diag\env.txt"
-          Get-Process | Where-Object MainWindowTitle |
-            Select-Object Id, ProcessName, MainWindowTitle |
-            Out-File "$diag\windows-before.txt" -Width 300
-          Start-Process -FilePath (Join-Path $env:GITHUB_WORKSPACE 'app\build-mingw\IranSignalTracker.exe')
-          Start-Sleep -Seconds 10
-          Get-Process | Where-Object { $_.Name -like '*IranSignalTracker*' } |
-            Select-Object Id, ProcessName, Responding, MainWindowTitle |
-            Out-File "$diag\app-process.txt" -Width 300
-          Get-Process | Where-Object MainWindowTitle |
-            Select-Object Id, ProcessName, MainWindowTitle |
-            Out-File "$diag\windows-after.txt" -Width 300
-          Get-WinEvent -LogName Application -MaxEvents 50 -ErrorAction SilentlyContinue |
-            Where-Object { $_.LevelDisplayName -eq 'Error' } |
-            Select-Object TimeCreated, ProviderName, Id, Message |
-            Out-File "$diag\eventlog-errors.txt" -Width 400
-          $bmp = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
-          $g = [System.Drawing.Graphics]::FromImage($bmp)
-          $g.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
-          $bmp.Save("$diag\desktop.png")
-          Stop-Process -Name IranSignalTracker -Force -ErrorAction SilentlyContinue
-
-      - name: Upload launch diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: desktop-diagnostics
-          path: diagnostics/
-          retention-days: 7
-
       # WAD exits 0x80004005 without Developer Mode (docs/env-setup.md).
       - name: Enable Developer Mode + install WinAppDriver 1.2.1
         shell: pwsh
@@ -152,6 +111,59 @@ jobs:
             catch { Start-Sleep -Seconds 1 }
           }
           if (-not $ok) { throw 'WinAppDriver never answered on 4729' }
+
+      # TEMPORARY SPIKE DIAGNOSTIC (remove once E2E is green): replicates the
+      # factory's launch + FindWindowW wait OUTSIDE pytest, from two working
+      # directories, then asks WAD's Root session what IT can see.
+      - name: Diagnose app launch + FindWindow + WAD view
+        shell: pwsh
+        run: |
+          $diag = Join-Path $env:GITHUB_WORKSPACE 'diagnostics'
+          New-Item -ItemType Directory -Force $diag | Out-Null
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+          Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class W { [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern System.IntPtr FindWindow(string cls, string title); }'
+          $exe = Join-Path $env:GITHUB_WORKSPACE 'app\build-mingw\IranSignalTracker.exe'
+          $title = 'Sign in - Iran Signal Tracker'
+          function Trial($tag, $cwd, $leaveRunning) {
+            Start-Process taskkill -ArgumentList '/F', '/IM', 'IranSignalTracker.exe' -Wait -ErrorAction SilentlyContinue
+            $p = Start-Process -FilePath $exe -WorkingDirectory $cwd -RedirectStandardOutput "$diag\repro-$tag-out.txt" -RedirectStandardError "$diag\repro-$tag-err.txt" -PassThru
+            $found = $false
+            $sw = [System.Diagnostics.Stopwatch]::StartNew()
+            while ($sw.Elapsed.TotalSeconds -lt 35) {
+              if ([W]::FindWindow($null, $title) -ne [System.IntPtr]::Zero) { $found = $true; break }
+              Start-Sleep -Milliseconds 500
+            }
+            $err = (Get-Content "$diag\repro-$tag-err.txt" -ErrorAction SilentlyContinue) -join ' | '
+            "tag=$tag cwd=$cwd found=$found afterSec=$([int]$sw.Elapsed.TotalSeconds) alive=$(-not $p.HasExited) exit=$($p.ExitCode) stderr=$err" |
+              Out-File "$diag\repro-summary.txt" -Append -Width 400
+            if (-not $leaveRunning -and -not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+          }
+          Trial 'rootcwd' $env:GITHUB_WORKSPACE $false
+          # Left running so the WAD Root probe below can see its window.
+          Trial 'autocwd' (Join-Path $env:GITHUB_WORKSPACE 'automation') $true
+          python automation\tools\probe_root.py 2>&1 | Out-File "$diag\wad-root-probe.txt" -Width 300
+          Get-Process | Where-Object MainWindowTitle |
+            Select-Object Id, ProcessName, MainWindowTitle |
+            Out-File "$diag\windows-final.txt" -Width 300
+          Get-WinEvent -LogName Application -MaxEvents 100 -ErrorAction SilentlyContinue |
+            Where-Object { $_.ProviderName -match 'Application Error|Windows Error Reporting' } |
+            Select-Object TimeCreated, ProviderName, Id, Message |
+            Out-File "$diag\eventlog-apperrors.txt" -Width 500
+          $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
+          $g = [System.Drawing.Graphics]::FromImage($bmp)
+          $g.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+          $bmp.Save("$diag\desktop.png")
+          Stop-Process -Name IranSignalTracker -Force -ErrorAction SilentlyContinue
+
+      - name: Upload launch diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-diagnostics
+          path: diagnostics/
+          retention-days: 7
 
       # Per-test fixture isolation (isolate_db) needs no pre-restore: it
       # restores + migrates the mapped fixture before EVERY test.
