@@ -84,8 +84,8 @@ jobs:
         shell: pwsh
         run: |
           reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /v AllowDevelopmentWithoutDevLicense /t REG_DWORD /d 1 /f
-          $msi = Join-Path $env:RUNNER_TEMP 'WindowsApplicationDriver-1.2.1-win10.msi'
-          Invoke-WebRequest -Uri 'https://github.com/microsoft/WinAppDriver/releases/download/v1.2.1/WindowsApplicationDriver-1.2.1-win10.msi' -OutFile $msi
+          $msi = Join-Path $env:RUNNER_TEMP 'WindowsApplicationDriver_1.2.1.msi'
+          Invoke-WebRequest -Uri 'https://github.com/microsoft/WinAppDriver/releases/download/v1.2.1/WindowsApplicationDriver_1.2.1.msi' -OutFile $msi
           Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /norestart" -Wait
           $exe = "${env:ProgramFiles(x86)}\Windows Application Driver\WinAppDriver.exe"
           if (-not (Test-Path $exe)) { throw 'WinAppDriver.exe missing after MSI install' }
@@ -121,6 +121,13 @@ jobs:
         run: |
           $results = Join-Path $env:GITHUB_WORKSPACE 'reports\allure-results'
           $report  = Join-Path $env:GITHUB_WORKSPACE 'reports\allure-report'
+          # Nothing to generate when the tests never ran (upstream step
+          # failed) - fail soft so the report step doesn't mask the real
+          # error; the job is already red at that point.
+          if (-not (Test-Path $results)) {
+            Write-Host 'no allure-results - tests never ran; skipping report generation'
+            exit 0
+          }
           $ok = $false
           for ($attempt = 1; $attempt -le 3; $attempt++) {
             if (Test-Path $report) { Remove-Item -Recurse -Force $report }
