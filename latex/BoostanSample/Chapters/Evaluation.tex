@@ -72,42 +72,120 @@
 \autoref{fig:allure}
 در فصل‌های قبلی جریان را بازگو می‌کنند.
 
-\section{انتقال به پایپلاین \lr{CI/CD}}
-چارچوب از ابتدا برای سوار‌شدن بر پایپلاین طراحی شده است. شکل هدف پایپلاین چنین است:
+\section{پیاده‌سازی پایپلاین \lr{CI/CD}}
+چارچوب از ابتدا برای سوار‌شدن بر پایپلاین طراحی شد و این انتقال اکنون پیاده‌سازی و اجرا شده است: سه فایل گردش‌کار در مسیر
+\lr{.github/workflows}
+مخزن، سه سطح از راستی‌آزمایی را روی رانرهای ویندوزیِ میزبان (\lr{windows-latest}) پوشش می‌دهند. جدول
+\autoref{tab:workflows}
+ساختار این سه سطح را نشان می‌دهد.
+
+\begin{table}[H]
+\centering
+\caption{سطوح پایپلاین \lr{CI/CD} پیاده‌سازی‌شده در مخزن}
+\label{tab:workflows}
+\begin{tabularx}{\textwidth}{@{}llXX@{}}
+\hline
+فایل & ماشه & دامنه & خروجی \\
+\hline
+\lr{ci.yml} & درخواست ادغام به \lr{main} & ساخت برنامه + دروازه‌ی \lr{ctest} & لاگ \lr{ctest} \\
+\lr{e2e-nightly.yml} & زمان‌بندی شبانه + اجرای دستی & ساخت + سوییت کامل سرتاسری & گزارش و نتایج \lr{Allure} + دیاگنوستیک \\
+\lr{tags.yml} & انتشار برچسب & هر دو سطح با هم & گزارش‌ها و لاگ‌ها \\
+\hline
+\end{tabularx}
+\end{table}
+
+چند تصمیم طراحی این سطح‌ها قابل توجه است. نخست، اسکریپت‌های مخزن بدون هیچ تغییری روی رانر کار می‌کنند: زنجیره‌ی ابزار از طریق متغیرهای محیطی
+\lr{IST\_*}
+(همان نقاط بازپیکربندی
+\lr{build.ps1})
+سیم‌کشی می‌شود و نسخه‌ها با پین‌های مستندات محیط هم‌تراز می‌مانند (
+\lr{CMake 3.30.5}،
+\lr{Qt 6.8.3} با معماری
+\lr{win64\_mingw}
+و ماژول
+\lr{qtcharts}
+— چارت‌ها افزونه‌ی جدا از
+\lr{qtbase}
+هستند — به همراه زنجیره‌ی
+\lr{MinGW 13.1}
+خود
+\lr{Qt}).
+دوم، برای سطح سرتاسری، پشته‌ی درایور به شکل پیش‌فرض (مسیر
+\lr{Appium})
+برپا می‌شود:
+\lr{appium 3.8.0}
+با درایور
+\lr{appium-windows-driver 6.3.1}
+(به‌همراه اصلاح شناخته‌شده‌ی اتصال پوشه‌ی
+\lr{node\_modules}
+کاربر به بسته‌ی سراسری در
+\lr{Appium 3})
+و نصب بی‌صداي
+\lr{WinAppDriver 1.2.1}
+با فعال‌کردن حالت توسعه‌دهنده؛ زیرا
+\lr{WinAppDriver}
+بدون آن با خطا خارج می‌شود. سوم، سناریوی نمایشی عمداً شکست‌خورده
+(\lr{TC019})
+در رانر حذف می‌شود تا کار قرمز نشود — در اجرای محلی با سوییت کامل همچنان حاضر است. چهارم، ساخت گزارش با تلاش مجدد سه‌باره انجام می‌شود (مسابقه‌ی قفل‌شدن فایل با پویش ویروس در ویندوز، مشاهد‌شده و مستند) و همه‌ی خروجی‌ها (نتایج و گزارش
+\lr{Allure}،
+لاگ
+\lr{ctest}،
+دیاگنوستیک میز) حتی در صورت شکست با شرط
+\lr{always()}
+منتشر می‌شوند؛ برای درخواست‌های ادغام نیز اجرای هم‌زمان‌ها با هم لغو می‌شود تا رانر هدر نرود.
+
+اسکلت کوتاه‌شده‌ی گردش‌کار شبانه (ستون دوم جدول) نمونه‌ی واقعی این ساختار است:
+
 \begin{latin}
-\begin{lstlisting}[language=bash, numbers=none]
-Commit
-  -> Build App        (cmake configure + build; ctest smoke + db_test gate)
-  -> Launch Appium    (appium server on :4723)
-  -> Launch Application (driver factory starts the exe via caps)
-  -> Execute Tests    (python -m pytest automation/tests)
-  -> Generate Allure  (allure generate ... -o reports/allure-report)
-  -> Publish Report   (host allure-report artefact, if: always())
+\begin{lstlisting}[numbers=none, basicstyle=\ttfamily\scriptsize]
+name: e2e-nightly
+on:
+  schedule: [{cron: '30 2 * * *'}]   # ~06:00 local
+  workflow_dispatch: {}
+jobs:
+  e2e:
+    runs-on: windows-latest
+    steps:
+      - uses: jurplel/install-qt-action@v4.4.1
+        with: {version: '6.8.3', arch: win64_mingw,
+               modules: 'qtcharts', tools: 'tools_mingw1310', cache: true}
+      - run: python -m pip install -r automation\requirements.txt
+      - run: npm install -g allure@3.21.0 appium@3.8.0
+      - run: appium driver install --source npm appium-windows-driver@6.3.1
+      - run: powershell -ExecutionPolicy Bypass -File scripts\build.ps1
+      - run: # enable Developer Mode + silent WinAppDriver 1.2.1 MSI
+      - run: # start Appium on :4723, poll until the port answers
+      - run: python -m pytest tests -v --alluredir=reports\allure-results
+             --deselect tests/test_tc019_demo_failure.py::test_tc019_demo_failure
+      - if: always()
+        run: allure generate reports\allure-results -o reports\allure-report --clean
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: {name: e2e-allure, path: reports/allure-*}
 \end{lstlisting}
 \end{latin}
 
-نکات طراحی‌شده برای نویسنده‌ی پایپلاین: نهان‌گاه کردن مسیرهای
+راه‌اندازی این پایپلاین روی رانر میزبان، چند رفتار تازه از زیرساخت آشکار کرد که هر یک با کاوش مستند شد: نصب‌کننده‌ی
 \lr{Qt}
-،
-\lr{MinGW}
-و
-\lr{Python}
-بر اساس پین‌های نسخه در مستندات محیط؛ نیاز رانر به ویندوز، حالت توسعه‌دهنده و نصب
-\lr{WinAppDriver}؛
-شکست هر تست به معنی شکست کار بدون حذف انتشار گزارش (با شرط
-\lr{always()})
-؛ و مسیر اجرای بی‌سر با
-\lr{DRIVER\_MODE=direct}
-که سرور
+مسیر داده‌شده را با پیشوند
+\lr{C:\textbackslash Qt}
+ترکیب می‌کند و مسیرهای واقعی باید از متغیرهای محیطی خروجیِ خودِ اقدام خوانده شوند؛ سرور
 \lr{Appium}
-را از معادله حذف می‌کند و مستقیماً به
-\lr{WinAppDriver}
-وصل می‌شود. جداسازی پایگاه‌داده در سطح تست (\autoref{chap:framework})
-ضمانت می‌کند که اجراهای موازی‌نما و متوالی روی یک رانر، به هم آلودگی ایجاد نکنند.
+اگر خروجی استانداردش به گام اجرا گره بخورد، با بسته‌شدن ورودی استاندارد خارج می‌شود و باید با کنسول تازه اجرا شود؛ و نسخه‌ی
+\lr{WAD 1.2.1}
+دستگیره‌های
+\lr{W3C}
+نسخه‌ی ۴ سلنیوم را نمی‌پذیرد (خطای
+\lr{Bad capabilities}
+در مسیر اجرای بی‌سر) — از این رو سطح شبانه روی مسیر اصلی
+\lr{Appium}
+اجرا می‌شود و سطح برچسب‌ها با اجرای مستقیمِ
+\lr{WAD}
+تنها پیکربندی شده است. این نکات به عنوان پین و هشدار در خود گردش‌کارها ثبت‌اند تا نویسنده‌ی آینده دوباره به آن‌ها برخورد نکند.
 
 چگونگی کار تست در پایپلاین نیز قواعدی دارد که چارچوب به آن‌ها پاسخ می‌دهد: نخست، هر تغییر کد (هر
 \lr{commit}
-یا درخواست ادغام) باید ماشه‌ی اجرا باشد تا بازخورد پیش از ادغام برسد؛ دوم، ترتیب مراحل ارزان به گران است \pdash{} اول ساخت برنامه و تست‌های داخلی سریع (آزمون دود و لایه‌ی داده) به عنوان دریچه، سپس تست‌های سرتاسری \pdash{} تا هزینه فقط روی کدهای سالم پرداخت شود؛ سوم، رانر باید تازه و ایزوله باشد (حذف فرایندهای باقی‌مانده، بازگردانی فیکسچر پیش از هر تست) و نهان‌گاه مسیرهای سنگین
+یا درخواست ادغام) باید ماشه‌ی اجرا باشد تا بازخورد پیش از ادغام برسد؛ دوم، ترتیب مراحل ارزان به گران است — اول ساخت برنامه و تست‌های داخلی سریع (آزمون دود و لایه‌ی داده) به عنوان دریچه، سپس تست‌های سرتاسری — تا هزینه فقط روی کدهای سالم پرداخت شود؛ سوم، رانر باید تازه و ایزوله باشد (حذف فرایندهای باقی‌مانده، بازگردانی فیکسچر پیش از هر تست) و نهان‌گاه مسیرهای سنگین
 \lr{Qt}
 و
 \lr{MinGW}
@@ -115,13 +193,13 @@ Commit
 \lr{Allure}
 و نتایج آن) نگهداری شود تا شکست‌ها قابل مرور و مقایسه باشند؛ و پنجم، شکست هر تست باید کار را قرمز کند اما گزارش را هرگز حذف نکند. برای کوتاه‌شدن حلقه‌ی بازخورد، سوییت سریع‌تر (مثلاً
 \lr{smoke})
-را می‌توان روی هر تغییر اجرا کرد و سوییت کامل را پس از ادغام.
+را می‌توان روی هر تغییر اجرا کرد و سوییت کامل را پس از ادغام یا شبانه اجرا کرد.
 
 چارچوب به صورت متن‌باز در مخزن
 \lr{GitHub}
 به نشانی
 \url{https://github.com/AlirezaBKHN/Qtcpp_E2E_Testing}
-در دسترس است. برای استفاده محلی پس از نصب پیش‌نیازها (مستندشده در مخزن): ساختن برنامه با
+در دسترس است و پایپلاین همین مخزن اجرا می‌شود. برای استفاده محلی پس از نصب پیش‌نیازها (مستندشده در مخزن): ساختن برنامه با
 \lr{scripts\textbackslash build.ps1}،
 برپایی سرور درایور با
 \lr{scripts\textbackslash run-appium.ps1}
