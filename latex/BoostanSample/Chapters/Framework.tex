@@ -18,7 +18,49 @@
 
 این جداسازی مستقیماً از الگوی شیء صفحه می‌آید
 \cite{fowler2002}
-اما با یک قاعده‌ی سخت‌گیرانه‌تر تکمیل شده است: دایرکتوری تست‌ها در بازرسی خودکار به فراخوانی‌های درایور حساس است و وجود حتی یک فراخوانی خام، ساخت را می‌شکند. به این ترتیب مرز لایه‌ها قرارداد شفاهی نمی‌ماند.
+اما با یک قاعده‌ی سخت‌گیرانه‌تر تکمیل شده است: دایرکتوری تست‌ها در بازرسی خودکار به فراخوانی‌های درایور حساس است و وجود حتی یک فراخوانی خام، ساخت را می‌شکند. به این ترتیب مرز لایه‌ها قرارداد شفاهی نمی‌ماند. شکل
+\autoref{fig:arch}
+این لایه‌بندی را به همراه ابزارهای جانبی (نگاشت سوییت‌ها، فیکسچرهای پایگاه‌داده و گزارش‌ساز) در کنار هم نشان می‌دهد: جریان اصلی از بالا به پایین است و هر لایه فقط با لایه‌ی مجاور خود صحبت می‌کند.
+
+\begin{figure}[H]
+\centering
+\begin{latin}
+\begin{tikzpicture}[
+  node distance=0.5cm and 1.1cm,
+  box/.style={draw, rounded corners, align=center, minimum width=6.4cm,
+              minimum height=0.75cm, font=\footnotesize},
+  side/.style={draw, dashed, rounded corners, align=center, minimum width=3.6cm,
+               minimum height=0.7cm, font=\footnotesize, fill=gray!12},
+  arr/.style={-{Stealth[length=2.2mm]}, thick}
+]
+\node[box] (tests) {\textbf{Tests} (pytest) --- TC001..TC025 scenarios};
+\node[box, below=of tests] (dsl) {\textbf{DSL layer} --- dsl/tracker.py};
+\node[box, below=of dsl] (po) {\textbf{Page Objects} --- pageobjects/*.py};
+\node[box, below=of po] (loc) {\textbf{Locators + resolve\_element} --- stable ids, handle cache, scoped find};
+\node[box, below=of loc] (factory) {\textbf{Driver Factory} --- phase attach, foreground, keyboard};
+\node[box, below=of factory] (appium) {\textbf{Appium server} (:4723)};
+\node[box, below=of appium] (wad) {\textbf{WinAppDriver} (:4729)};
+\node[box, below=of wad] (app) {\textbf{Iran Signal Tracker} (Qt C++ + SQLite)};
+
+\node[side, right=of tests] (allure) {Allure results $\rightarrow$ HTML report};
+\node[side, right=of dsl] (suites) {suites.json --- suite mapping};
+\node[side, right=of loc] (fixt) {fixtures.json + SQLite fixtures};
+
+\draw[arr] (tests) -- (dsl);
+\draw[arr] (dsl) -- (po);
+\draw[arr] (po) -- (loc);
+\draw[arr] (loc) -- (factory);
+\draw[arr] (factory) -- (appium);
+\draw[arr] (appium) -- (wad);
+\draw[arr] (wad) -- (app);
+\draw[arr, dashed] (suites) -- (tests);
+\draw[arr, dashed] (fixt) |- (app.east);
+\draw[arr, dashed] (tests) -- (allure);
+\end{tikzpicture}
+\end{latin}
+\caption{معماری لایه‌ای چارچوب تست و ابزارهای جانبی آن}
+\label{fig:arch}
+\end{figure}
 
 \section{قراردادهای پایداری در برنامه}
 شکننده‌ترین بخش تست‌های رابط کاربری، مکان‌یابی است. چارچوب دو قرارداد در سطح برنامه‌ی نمونه تعریف می‌کند که برنامه‌های هدف باید رعایت کنند:
