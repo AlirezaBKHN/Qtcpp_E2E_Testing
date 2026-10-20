@@ -1,104 +1,162 @@
 """The human-readable DSL facade. Tests must only speak this language.
 
-Binding contract (from the handoff PRD):
+Auth-first binding contract (auth-tabs-dashboards plan):
 
-    tracker.launch()
-    tracker.province("Tehran")
-    tracker.city("Tehran")
-    tracker.technology("5G")
-    tracker.search()
-    tracker.table().should_have_rows()
-    tracker.table().should_contain("Irancell")
-    tracker.chart().should_be_visible()
-    tracker.export().should_create_file()
+    tracker.launch()          # gates on the signin window (foreground forced)
+    tracker.register(u, p)    # performs; register_message() reads the label
+    tracker.login(u, p)       # performs; signin_message() reads the label
+    tracker.logout()          # lands back on the sign-in dialog
+    tracker.current_user()    # top-bar readout ('' before login)
+    tracker.network()         # -> NetworkDsl (filters/table/chart/export/... )
+    tracker.dashboard()       # -> DashboardDsl (kpi/trend_points/worst cells)
+    tracker.reports()         # -> ReportsDsl
+    tracker.users()           # -> UsersDsl, admin only (raises otherwise)
 
-Additive helpers only: should_have_row_count(n), operator_name(...),
-reset(), refresh(), quit().
+Actions perform; readers return data; the TESTS assert. No hybrid
+login_should_fail-style methods.
 """
 from __future__ import annotations
 
 import time
-from pathlib import Path
 
-import config as C
-from drivers.factory import get_driver, quit_driver
+from drivers import factory
+from drivers.factory import quit_driver
+from pageobjects import resolve_element
+from pageobjects.resolve_element import find
 from drivers.foreground import focus_app
-from dsl.export_result import ExportResult
-from pageobjects.chart_widget import SignalChart
-from pageobjects.main_page import MainPage
-from pageobjects.table_widget import SignalTable
+from dsl.dashboard import DashboardDsl
+from dsl.network import NetworkDsl
+from dsl.reports import ReportsDsl
+from dsl.users import UsersDsl
+from pageobjects.signin_page import SignInPage
+from pageobjects.tabs_bar import TabsBar
+
+_SIGNIN_WINDOW_TITLE = factory._SIGNIN_WINDOW_TITLE
+_MAIN_WINDOW_TITLE = factory._MAIN_WINDOW_TITLE
 
 
 class SignalTrackerDsl:
     def __init__(self):
         self._driver = None
-        self._main = None
+        self._signin = None
+        self._tabs = None
+
+    # -- phase plumbing -------------------------------------------------
+    def _attach_phase(self, window_title: str) -> None:
+        """Re-attach the session to a NEW top-level window phase.
+
+        WAD pins a session to one window handle (see drivers/factory.py);
+        every auth transition destroys the old window, so page objects are
+        rebuilt on the fresh session after each attach. Cached element
+        handles die with the old session - drop them.
+        """
+        self._driver = factory.attach(window_title)
+        resolve_element.invalidate()
+        self._signin = SignInPage(self._driver)
+        self._tabs = TabsBar(self._driver)
+        focus_app()
 
     # -- lifecycle ------------------------------------------------------
     def launch(self) -> "SignalTrackerDsl":
-        self._driver = get_driver()
-        self._main = MainPage(self._driver)
-        main = self._driver.find_elements("xpath", MainPage.WINDOW_XPATH)
-        deadline = time.time() + 30
-        while not main and time.time() < deadline:
-            time.sleep(0.5)
-            main = self._driver.find_elements("xpath", MainPage.WINDOW_XPATH)
-        assert main, "Iran Signal Tracker window did not appear"
-        # The window may open BEHIND other application windows (a terminal,
-        # the agent's chat). Every later keystroke/click would land there
-        # (observed: typing landed in a chat window). Force the OS foreground
-        # to the app before any interaction in the session.
+        """Open the app and land on the sign-in window.
+
+        The app must be OS-foreground BEFORE any interaction (WAD sends
+        keystrokes to the focused window, clicks to whatever occupies the
+        element's screen coordinates - observed: test strings ended up in a
+        chat window). launch() hard-fails if it cannot acquire focus.
+        """
+        self._attach_phase(_SIGNIN_WINDOW_TITLE)
+        self._signin.wait_visible()
         focus_app()
         return self
 
     def quit(self) -> None:
         quit_driver()
         self._driver = None
-        self._main = None
+        self._signin = None
+        self._tabs = None
 
-    # -- filters (binding names) ---------------------------------------
-    def province(self, value: str) -> "SignalTrackerDsl":
-        self._main.select_combo("provinceCombo", value)
-        return self
+    # -- auth actions ---------------------------------------------------
+    def register(self, username: str, password: str) -> None:
+        """Switch to register mode in place, fill, submit. The outcome is
+        read back through register_message()."""
+        self._signin.click_register_toggle()
+        self._signin.fill(username, password)
+        self._signin.click_register()
 
-    def city(self, value: str) -> "SignalTrackerDsl":
-        self._main.select_combo("cityCombo", value)
-        return self
+    def register_message(self) -> str:
+        """The register-mode status; after a SUCCESS the dialog switched
+        back to login mode carrying the pinned copy there, so fall back to
+        the login status readout."""
+        try:
+            return self._signin.register_message()
+        except LookupError:
+            return self._signin.signin_message()
 
-    def technology(self, value: str) -> "SignalTrackerDsl":
-        self._main.select_combo("technologyCombo", value)
-        return self
+    def toggle_register_mode(self) -> None:
+        """Flip Login <-> Register in place (navigation only; a failed
+        register leaves the dialog in register mode)."""
+        self._signin.click_register_toggle()
 
-    def operator_name(self, value: str) -> "SignalTrackerDsl":
-        self._main.select_combo("operatorCombo", value)
-        return self
+    def login(self, username: str, password: str) -> None:
+        """Fill the sign-in form and submit. The outcome is read back
+        through signin_message(); success re-attaches the session to the
+        tabbed main window (a new top-level phase)."""
+        self._signin.fill(username, password)
+        focus_app()
+        self._signin.click_login()
+        deadline = time.time() + 15
+        while time.time() < deadline:
+            if factory._find_window(_MAIN_WINDOW_TITLE):
+                self._attach_phase(_MAIN_WINDOW_TITLE)
+                return  # main window phase
+            time.sleep(0.3)
+        return  # dialog still there: login failed; read signin_message()
 
-    # -- actions --------------------------------------------------------
-    def search(self) -> "SignalTrackerDsl":
-        self._main.click_search()
-        return self
+    def signin_message(self) -> str:
+        return self._signin.signin_message()
 
-    def reset(self) -> "SignalTrackerDsl":
-        self._main.click_reset()
-        return self
+    def logout(self) -> None:
+        self._tabs.click_logout()
+        # The main window is destroyed and the sign-in dialog reappears as
+        # a NEW top-level window: re-attach to its phase.
+        self._attach_phase(_SIGNIN_WINDOW_TITLE)
+        self._signin.wait_visible()
 
-    def refresh(self) -> "SignalTrackerDsl":
-        self._main.click_refresh()
-        return self
+    def current_user(self) -> str:
+        return self._tabs.current_user()
 
-    # -- sub-views ------------------------------------------------------
-    def table(self) -> SignalTable:
-        return SignalTable(self._main)
+    # -- sub-tab access -------------------------------------------------
+    def _route_home(self, card: str) -> None:
+        """Route to a tab via the Home card for that page.
 
-    def chart(self) -> SignalChart:
-        return SignalChart(self._main)
+        The cards live only on the homeTab page (hidden pages are pruned
+        from the UIA control view), so routing goes Home (QTabBar) first -
+        deterministic whether this is a fresh session or a mid-flow switch.
+        """
+        self._tabs.click_tab("homeTab")
+        self._tabs.click_home_card(card)
 
-    def export(self) -> ExportResult:
-        C.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
-        before = {p.name for p in C.EXPORT_DIR.glob("export_*.csv")}
-        self._main.click_export()
-        return ExportResult(C.EXPORT_DIR, before)
+    def network(self) -> NetworkDsl:
+        return NetworkDsl(self._driver, self._route_home)
 
-    # -- additive helpers ------------------------------------------------
-    def row_count(self) -> int:
-        return self._main.row_count_text()
+    def dashboard(self) -> DashboardDsl:
+        return DashboardDsl(self._driver, self._route_home)
+
+    def reports(self) -> ReportsDsl:
+        return ReportsDsl(self._driver, self._route_home)
+
+    def users(self) -> UsersDsl:
+        """Admin-only: raises when the Users tab is not mounted.
+
+        The gate reads the QTabBar item ('Users' exists only for admin
+        sessions): the usersTab PAGE widget is a hidden tab page and WAD
+        prunes hidden pages from an attached session's tree.
+        """
+        try:
+            find(self._driver, "tabItem_usersTab")
+        except LookupError as exc:
+            raise AssertionError(
+                "users tab unavailable (the usersTab page is mounted for "
+                "admin sessions only)") from exc
+        return UsersDsl(self._driver, self._route_home)

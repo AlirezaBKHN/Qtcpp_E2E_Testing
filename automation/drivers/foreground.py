@@ -17,6 +17,9 @@ import ctypes
 import time
 
 APP_WINDOW_TITLE = "Iran Signal Tracker"
+SIGNIN_WINDOW_TITLE = "Sign in - Iran Signal Tracker"  # launch gate (Task 3)
+
+APPLE_APP_WINDOW_TITLES = (SIGNIN_WINDOW_TITLE, APP_WINDOW_TITLE)
 
 _SetForegroundWindow = ctypes.windll.user32.SetForegroundWindow
 _FindWindowW = ctypes.windll.user32.FindWindowW
@@ -25,7 +28,11 @@ _keybd_event = ctypes.windll.user32.keybd_event
 
 
 def _hwnd() -> int:
-    return _FindWindowW(None, APP_WINDOW_TITLE)
+    for title in APPLE_APP_WINDOW_TITLES:
+        hwnd = _FindWindowW(None, title)
+        if hwnd:
+            return hwnd
+    return 0
 
 
 def is_foreground() -> bool:

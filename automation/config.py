@@ -34,4 +34,32 @@ BY_ID = "id"          # UIA AutomationId
 BY_NAME = "name"      # UIA Name (accessible name)
 BY_XPATH = "xpath"
 
-implicit_timeout_ms = 10_000
+# 2s: most finds hit in <0.3s; misses (popup-item polls, phase churn) must
+# not burn 10s each - probed 2026-10-20: attached-session finds answer in
+# ~0.2s and the popup settle sleep covers the draw latency.
+implicit_timeout_ms = 2_000
+
+# -- Auth + tabbed app (auth-tabs-dashboards plan) --------------------------
+# Seeded demo accounts (owner-confirmed; plaintext demo-grade).
+E2E_USER = "e2e_user"
+E2E_PASSWORD = "e2e123"
+ADMIN_USER = "admin"
+ADMIN_PASSWORD = "admin"
+
+# The committed DB restored before every test (per-test isolation).
+DB_PATH = Path(os.environ.get(
+    "IST_DB_PATH", REPO_ROOT / "database" / "signaltracker.db"))
+
+SIGNIN_IDS = (
+    "signinWindow", "usernameField", "passwordField",
+    "loginButton", "registerToggle", "registerButton",
+    "signinStatus", "registerStatus",
+)
+TAB_IDS = (
+    "mainTabs", "homeTab", "networkTab", "dashboardTab",
+    "reportsTab", "usersTab",
+)
+HOME_CARD_IDS = (
+    "homeCardNetwork", "homeCardDashboard", "homeCardReports", "homeCardUsers",
+)
+TOP_BAR_IDS = ("currentUserLabel", "logoutButton")

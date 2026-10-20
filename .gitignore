@@ -16,3 +16,6 @@ __pycache__/
 .agents/
 .opencode/
 skills-lock.json
+.superpowers/
+
+latex/

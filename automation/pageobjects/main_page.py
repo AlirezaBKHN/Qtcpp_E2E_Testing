@@ -1,7 +1,10 @@
 """Filter section, buttons, and navigation."""
 from __future__ import annotations
 
-from pageobjects.resolve_element import find
+import time
+
+from drivers import keyboard
+from pageobjects.resolve_element import find, find_within
 
 COMBOS = ("provinceCombo", "cityCombo", "technologyCombo", "operatorCombo")
 
@@ -9,9 +12,20 @@ WINDOW_XPATH = "//Window"
 
 
 class MainPage:
-    """Responsible for filters, buttons, and top-level navigation."""
+    """Responsible for filters, buttons, and top-level navigation.
+
+    Filter-row controls resolve WITHIN the app's named `filterSection`
+    (small UIA subtree; probed 0.02s scoped vs 11-38s from the root).
+    Everything else (status bar, table, chart) resolves from the root -
+    the status bar and the data widgets live outside the section, and the
+    handle cache amortizes their first finds.
+    """
 
     WINDOW_XPATH = WINDOW_XPATH  # re-export as class attribute
+
+    SECTION_ID = "filterSection"
+    _SECTION_MEMBERS = COMBOS + ("searchButton", "refreshButton",
+                                 "resetButton", "exportButton")
 
     def __init__(self, driver):
         self._driver = driver
@@ -20,24 +34,36 @@ class MainPage:
     # -- lookup --------------------------------------------------------
     def _el(self, control: str):
         if control not in self._elements:
-            self._elements[control] = find(self._driver, control)
+            if control in self._SECTION_MEMBERS:
+                self._elements[control] = find_within(
+                    self._driver, self.SECTION_ID, control)
+            else:
+                self._elements[control] = find(self._driver, control)
         return self._elements[control]
 
     # -- filters -------------------------------------------------------
     def select_combo(self, control: str, value: str) -> None:
         """Select `value` in the combo `control` (cascades happen on change).
 
-        Keyboard-first: typing into a closed non-editable QComboBox selects
-        the matching item (type-ahead) and fires currentIndexChanged, which
-        also drives the city cascade. This avoids the popup-item ambiguity
-        of element clicks: once the table is visible, table cells share the
-        item's Name (e.g. 'Tehran'), so finding elements by Name can match
-        and click a table cell instead of the popup item.
+        Popup KEYBOARD selection (live-probed 2026-10-20): clicking the
+        combo opens the popup and hands it keyboard focus; typing the
+        value's text runs Qt's type-ahead to the matching item and Enter
+        commits it. NO WAD calls happen while the popup is open - finds on
+        this tab cost ~11s each (the 10,080-row table bloats the UIA tree;
+        XPath ListItem finds measured 40s), while the OS-level keystrokes
+        are free. Verified end-to-end: Tehran -> 'Showing 1025 rows'.
 
-        Requires the app to be foreground (enforced in launch()): WAD
-        delivers keystrokes to whatever window has keyboard focus.
+        This supersedes BOTH older rulings: keyboard type-ahead into a
+        CLOSED combo is dead in attached sessions (keystrokes land
+        nowhere), and popup-item clicks (find //ListItem[@Name=...]) are
+        too slow to keep.
         """
-        self._el(control).send_keys(value)
+        el = self._el(control)  # cached handle: click is ~0.2s
+        el.click()              # popup opens and takes keyboard focus
+        time.sleep(0.5)         # popup draw settle
+        keyboard.type_text(value)
+        keyboard.press_enter()  # commits the type-ahead item, popup closes
+        time.sleep(0.6)         # cascade settle (city combo repopulates)
 
     def apply_filters(self, province: str | None = None, city: str | None = None,
                       technology: str | None = None, operator: str | None = None) -> None:
@@ -81,16 +107,14 @@ class MainPage:
     def row_count_text(self) -> int:
         """Stable, fast row count from the status bar ('Showing N rows').
 
-        Note: WAD's XPath lacks `starts-with` (silently empty); `contains`
-        is supported and safe here because the app only emits this phrase
-        in the status bar.
+        The statusText handle is cached like every other control (finds
+        cost ~11s on this tab); get_attribute("Name") reads the LIVE text
+        through the cached ref (probed 0.01s).
         """
-        texts = self._driver.find_elements(
-            "xpath", f"{WINDOW_XPATH}//*[contains(@Name,'Showing')]")
-        for el in texts:
-            name = el.get_attribute("Name")
-            if name and name.startswith("Showing "):
-                parts = name.split()
-                if len(parts) >= 3 and parts[2].startswith("rows"):
-                    return int(parts[1])
+        el = find(self._driver, "statusText")
+        name = el.get_attribute("Name") or ""
+        if name.startswith("Showing "):
+            parts = name.split()
+            if len(parts) >= 3 and parts[2].startswith("rows"):
+                return int(parts[1])
         raise AssertionError("no 'Showing N rows' status message found")
