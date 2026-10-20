@@ -63,13 +63,12 @@ void repopulateCombo(QComboBox* combo, const QStringList& values)
 
 } // namespace
 
-// Display cap (owner decision 2026-10-20): only the first kMaxDisplayedRows
-// of a query land in the table widget. The status bar and the CSV export
+// Pager (spec 2026-10-20): the table shows ONE page of the query at a
+// time (page-size selector 50/100/200/1000, default 200 - the old display
+// cap was simply page 1 of the pager). The status bar and the CSV export
 // keep reporting/writing the FULL query size, so the user still sees the
-// real data size; the small UIA tree keeps automation finds fast (probed:
+// real data size; the bounded UIA tree keeps automation finds fast (probed:
 // the 10,080-row tree made every find cost ~11s, page_source 40s/6.9MB).
-// Pagination/load-more can build on this later.
-constexpr int kMaxDisplayedRows = 200;
 
 MainWindow::MainWindow(const QString& user, QWidget* parent)
     : QMainWindow(parent)
@@ -124,6 +123,42 @@ MainWindow::MainWindow(const QString& user, QWidget* parent)
     signalTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     signalTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
 
+    // -- Pager (spec 2026-10-20) --------------------------------------------
+    // One row under the table: prev / readout / next / page-size selector.
+    // pageLabel is a readout: objectName keeps the stable id, accessibleName
+    // mirrors the displayed text ("Page k of n" - automation reads the Name).
+    auto* prevButtonPtr = new QPushButton(tr("Prev"), this);
+    prevPageButton =
+        qobject_cast<QPushButton*>(makeStable(prevButtonPtr, "prevPageButton"));
+    auto* nextButtonPtr = new QPushButton(tr("Next"), this);
+    nextPageButton =
+        qobject_cast<QPushButton*>(makeStable(nextButtonPtr, "nextPageButton"));
+    pageLabel = new QLineEdit(this);
+    pageLabel->setReadOnly(true);
+    pageLabel->setFrame(false);
+    pageLabel->setObjectName(QStringLiteral("pageLabel"));
+    pageSizeCombo = makeCombo(this, "pageSizeCombo",
+                              {QStringLiteral("50"), QStringLiteral("100"),
+                               QStringLiteral("200"), QStringLiteral("1000")},
+                              false);
+    pageSizeCombo->setCurrentText(QStringLiteral("200"));
+    auto* pagerLayout = new QHBoxLayout;
+    pagerLayout->setContentsMargins(0, 0, 0, 0);
+    pagerLayout->addWidget(prevPageButton);
+    pagerLayout->addWidget(pageLabel, 1);
+    pagerLayout->addWidget(nextPageButton);
+    pagerLayout->addWidget(pageSizeCombo);
+    // Named E2E SECTION (same rationale as filterSection): the automation
+    // scopes pager finds to this small UIA subtree.
+    auto* pagerSection = makeStable(new QWidget(this), "pagerSection");
+    pagerSection->setLayout(pagerLayout);
+
+    auto* tablePane = new QWidget(this);
+    auto* tablePaneLayout = new QVBoxLayout(tablePane);
+    tablePaneLayout->setContentsMargins(0, 0, 0, 0);
+    tablePaneLayout->addWidget(signalTable, 1);
+    tablePaneLayout->addWidget(pagerSection);
+
     // -- Chart --------------------------------------------------------------
     chartGroupBy = makeCombo(this, "chartGroupBy", {tr("Operator"), tr("Technology")},
                              false);
@@ -161,7 +196,7 @@ MainWindow::MainWindow(const QString& user, QWidget* parent)
 
     // -- Assembly: tabbed main window ---------------------------------------
     auto* splitter = new QSplitter(Qt::Vertical, this);
-    splitter->addWidget(signalTable);
+    splitter->addWidget(tablePane);
 
     auto* chartPane = new QWidget(this);
     chartPane->setLayout(chartRow);
@@ -286,6 +321,10 @@ MainWindow::MainWindow(const QString& user, QWidget* parent)
             this, &MainWindow::onProvinceChanged);
     connect(chartGroupBy, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, [this] { refreshChart(); });
+    connect(prevPageButton, &QPushButton::clicked, this, &MainWindow::onPrevPage);
+    connect(nextPageButton, &QPushButton::clicked, this, &MainWindow::onNextPage);
+    connect(pageSizeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &MainWindow::onPageSizeChanged);
 
     // Initial view shows the full dataset.
     onSearch();
@@ -301,17 +340,55 @@ void MainWindow::onSearch()
     // chartGroupBy has no "All" entry, so it always reports its text.
     const auto rows = Db::queryFilters(current(provinceCombo), current(cityCombo),
                                        current(technologyCombo), current(operatorCombo));
-    signalTable->setRowCount(0);
-    const int shown = qMin<int>(rows.size(), kMaxDisplayedRows);
-    for (int i = 0; i < shown; ++i) {
-        const auto& row = rows.at(i);
-        signalTable->insertRow(i);
-        for (int c = 0; c < row.size() && c < signalTable->columnCount(); ++c)
-            signalTable->setItem(i, c, new QTableWidgetItem(row.at(c).toString()));
-    }
+    m_rows = rows;
+    m_page = 1; // every re-query restarts at page 1 (spec Review Focus 3)
+    populatePage();
     statusBar()->showMessage(
         QStringLiteral("Showing %1 rows").arg(rows.size()));
     refreshChart();
+}
+
+// Fill the table with the current page of m_rows and update the pager
+// readout + button edges. Called by every state change (re-query, page
+// move, page-size change) - the single place that touches the table.
+void MainWindow::populatePage()
+{
+    const int pages = qMax(1, (m_rows.size() + m_pageSize - 1) / m_pageSize);
+    m_page = qBound(1, m_page, pages);
+    signalTable->setRowCount(0);
+    const int start = (m_page - 1) * m_pageSize;
+    const int end = qMin(m_rows.size(), start + m_pageSize);
+    for (int i = start; i < end; ++i) {
+        const auto& row = m_rows.at(i);
+        const int r = i - start;
+        signalTable->insertRow(r);
+        for (int c = 0; c < row.size() && c < signalTable->columnCount(); ++c)
+            signalTable->setItem(r, c, new QTableWidgetItem(row.at(c).toString()));
+    }
+    const QString label = QStringLiteral("Page %1 of %2").arg(m_page).arg(pages);
+    pageLabel->setText(label);
+    pageLabel->setAccessibleName(label);
+    prevPageButton->setEnabled(m_page > 1);
+    nextPageButton->setEnabled(m_page < pages);
+}
+
+void MainWindow::onNextPage()
+{
+    ++m_page;
+    populatePage();
+}
+
+void MainWindow::onPrevPage()
+{
+    --m_page;
+    populatePage();
+}
+
+void MainWindow::onPageSizeChanged(int)
+{
+    m_pageSize = qMax(1, pageSizeCombo->currentText().toInt());
+    m_page = 1; // page-size change restarts at page 1 (spec Review Focus 4)
+    populatePage();
 }
 
 void MainWindow::onRefresh()

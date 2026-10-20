@@ -14,6 +14,8 @@
 #include <QtCharts/QLineSeries>
 #include <QtCharts/QValueAxis>
 #include <QtTest>
+#include <QtSql/QSqlDatabase>
+#include <QtSql/QSqlQuery>
 #include "db.h"
 #include "mainwindow.h"
 #include "signin_dialog.h"
@@ -27,6 +29,8 @@ private slots:
     void signinDialogEnsuresDomainDb();
     void mandatoryIdentifiersPresent();
     void tableDisplayCappedStatusReal();
+    void pagerContract();
+    void pagerEmptyResultScratch();
     void chartShowsValueLabelsAndData();
     void signinGateBlocksMainWindow();
     void registerModeValidation();
@@ -127,10 +131,11 @@ void SmokeMain::mandatoryIdentifiersPresent()
     }
 }
 
-// Display cap contract (owner decision 2026-10-20): the widget shows only
-// the first 200 rows of the query, while the status bar keeps reporting
-// the FULL count and the CSV export writes the full query. The small UIA
-// tree keeps E2E finds fast; the user still sees the real size.
+// Display cap contract (owner decision 2026-10-20, superseded by the
+// pager): the widget now shows page 1 of the paginated query (default page
+// size 200), while the status bar keeps reporting the FULL count and the
+// CSV export writes the full query. The small UIA tree keeps E2E finds
+// fast; the user still sees the real size via the pager.
 void SmokeMain::tableDisplayCappedStatusReal()
 {
     MainWindow w(QStringLiteral("admin"));
@@ -145,6 +150,94 @@ void SmokeMain::tableDisplayCappedStatusReal()
         QVERIFY2(text == QStringLiteral("Showing 10080 rows"),
                  qPrintable(QString("status bar says: %1").arg(text)));
     }
+}
+
+// Pager contract (spec 2026-10-20): page-size selector 50/100/200/1000
+// (default 200), prev/next with edge disabling, page-label math,
+// re-query and page-size changes reset to page 1. The old display cap
+// is now simply page 1 of the pager.
+void SmokeMain::pagerContract()
+{
+    MainWindow w(QStringLiteral("admin"));
+    w.show();
+    QTest::qWait(50);
+    auto* table = w.findChild<QTableWidget*>(QString::fromLatin1("signalTable"));
+    auto* label = w.findChild<QLineEdit*>(QString::fromLatin1("pageLabel"));
+    auto* next = w.findChild<QPushButton*>(QString::fromLatin1("nextPageButton"));
+    auto* prev = w.findChild<QPushButton*>(QString::fromLatin1("prevPageButton"));
+    QVERIFY(table && label && next && prev);
+    QCOMPARE(table->rowCount(), 200);
+    QCOMPARE(label->text(), QStringLiteral("Page 1 of 51"));
+    QCOMPARE(label->accessibleName(), label->text());
+    QVERIFY2(!prev->isEnabled(), "prev must be disabled on page 1");
+
+    next->click();
+    QCOMPARE(label->text(), QStringLiteral("Page 2 of 51"));
+    const auto rows = Db::queryFilters(QString(), QString(), QString(), QString());
+    QCOMPARE(table->item(0, 0)->text(), rows.at(200).at(0).toString()); // first id of page 2
+    prev->click();
+    QCOMPARE(label->text(), QStringLiteral("Page 1 of 51"));
+
+    // Partial last page: size 50 -> 202 pages, last page 30 rows.
+    auto* size = w.findChild<QComboBox*>(QString::fromLatin1("pageSizeCombo"));
+    QVERIFY(size != nullptr);
+    size->setCurrentText(QStringLiteral("50"));
+    QCOMPARE(label->text(), QStringLiteral("Page 1 of 202"));
+    QCOMPARE(table->rowCount(), 50);
+    for (int i = 0; i < 201; ++i)
+        next->click();
+    QCOMPARE(label->text(), QStringLiteral("Page 202 of 202"));
+    QCOMPARE(table->rowCount(), 30);
+    QVERIFY2(!next->isEnabled(), "next must be disabled on the last page");
+
+    // Page-size change resets to page 1 (Review Focus 4).
+    size->setCurrentText(QStringLiteral("1000"));
+    QCOMPARE(label->text(), QStringLiteral("Page 1 of 11"));
+    QCOMPARE(table->rowCount(), 1000);
+    next->click();
+    QCOMPARE(label->text(), QStringLiteral("Page 2 of 11"));
+
+    // A re-query after paging resets to page 1 (Review Focus 3).
+    auto* search = w.findChild<QPushButton*>(QString::fromLatin1("searchButton"));
+    QVERIFY(search != nullptr);
+    search->click();
+    QCOMPARE(label->text(), QStringLiteral("Page 1 of 11"));
+    QCOMPARE(table->item(0, 0)->text(), rows.at(0).at(0).toString());
+}
+
+// Empty result (Review Focus 2): Page 1 of 1, empty table, both pager
+// buttons disabled. Scratch DB emptied of cells; default connection
+// restored afterwards.
+void SmokeMain::pagerEmptyResultScratch()
+{
+    const QString scratch = QStringLiteral("smoke_pager_scratch.db");
+    QFile::remove(scratch);
+    QVERIFY(Db::init(scratch));
+    QSqlQuery wipe(QSqlDatabase::database());
+    QVERIFY(wipe.exec(QStringLiteral("DELETE FROM cells")));
+
+    // MainWindow's ctor re-asks the canonical path; without the override it
+    // would replace the scratch connection (same trap as the Task 1
+    // register leak) and onSearch would query the working store instead.
+    qputenv("IST_DB_PATH", scratch.toUtf8());
+    {
+        MainWindow w(QStringLiteral("admin"));
+        w.show();
+        QTest::qWait(50);
+        auto* table = w.findChild<QTableWidget*>(QString::fromLatin1("signalTable"));
+        auto* label = w.findChild<QLineEdit*>(QString::fromLatin1("pageLabel"));
+        QVERIFY(table && label);
+        QCOMPARE(table->rowCount(), 0);
+        QCOMPARE(label->text(), QStringLiteral("Page 1 of 1"));
+        QVERIFY(!w.findChild<QPushButton*>(QString::fromLatin1("prevPageButton"))->isEnabled());
+        QVERIFY(!w.findChild<QPushButton*>(QString::fromLatin1("nextPageButton"))->isEnabled());
+    }
+    qunsetenv("IST_DB_PATH");
+
+    // Restore the working store BEFORE removing the scratch: the open
+    // connection holds the file locked on Windows (Task 1 lesson).
+    Db::init(Db::defaultDatabasePath());
+    QFile::remove(scratch);
 }
 
 int main(int argc, char** argv)

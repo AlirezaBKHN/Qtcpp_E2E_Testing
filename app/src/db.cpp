@@ -143,6 +143,14 @@ bool Db::isProvince(const QString& province)
 
 QString Db::defaultDatabasePath()
 {
+    // Test hook: smoke/E2E scratch slots point the canonical path elsewhere
+    // (IST_DB_PATH). MainWindow's ctor re-asks the default path - without
+    // this override that re-ask would replace a scratch connection back
+    // with the working store (the same trap that leaked smoke_reg_success
+    // into the committed DB). Unset => unchanged behavior.
+    const QString overridePath = qEnvironmentVariable("IST_DB_PATH");
+    if (!overridePath.isEmpty())
+        return overridePath;
     return QDir(QCoreApplication::applicationDirPath())
         .absoluteFilePath(QStringLiteral("../../database/signaltracker.db"));
 }

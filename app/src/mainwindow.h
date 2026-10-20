@@ -7,6 +7,8 @@
 #include <QStatusBar>
 #include <QTableWidget>
 
+#include "db.h"
+
 class QAbstractAxis;
 class QBarCategoryAxis;
 class QChartView;
@@ -34,9 +36,13 @@ private slots:
     void onExport();
     void onProvinceChanged(int index);
     void onLogout();
+    void onPageSizeChanged(int index);
+    void onNextPage();
+    void onPrevPage();
 
 private:
     void refreshChart();
+    void populatePage();
     QComboBox* provinceCombo = nullptr;
     QComboBox* cityCombo = nullptr;
     QComboBox* technologyCombo = nullptr;
@@ -52,6 +58,15 @@ private:
     QChartView* signalChart = nullptr;
     QLineEdit* currentUserLabel = nullptr; // readout (value "user: <name>")
     QTabWidget* mainTabs = nullptr;
+
+    // Pager (spec 2026-10-20): one page of m_rows in the table at a time.
+    QComboBox* pageSizeCombo = nullptr;
+    QPushButton* prevPageButton = nullptr;
+    QPushButton* nextPageButton = nullptr;
+    QLineEdit* pageLabel = nullptr; // readout (value "Page k of n")
+    FilterBindings m_rows; // db.h file-level alias (QVector<QVariantList>)
+    int m_page = 1;
+    int m_pageSize = 200;
 
     QBarCategoryAxis* axisX = nullptr;
     QValueAxis* axisY = nullptr;
