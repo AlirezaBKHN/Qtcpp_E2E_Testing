@@ -45,7 +45,10 @@ static const char* kIds[] = {
     "filterSection", "headerSection",
     "provinceCombo", "cityCombo", "technologyCombo", "operatorCombo",
     "searchButton", "refreshButton", "resetButton", "exportButton",
-    "signalTable", "signalChart", "chartGroupBy"
+    "signalTable", "signalChart", "chartGroupBy",
+    // Pager (spec 2026-10-20); pageLabel is a READOUT (excluded, like
+    // currentUserLabel - its accessibleName carries text, not the id).
+    "pagerSection", "pageSizeCombo", "prevPageButton", "nextPageButton"
 };
 
 // The readout-contract + gate regression: the sign-in dialog must ensure
@@ -222,6 +225,11 @@ void SmokeMain::pagerEmptyResultScratch()
     qputenv("IST_DB_PATH", scratch.toUtf8());
     {
         MainWindow w(QStringLiteral("admin"));
+        // Unset the override IMMEDIATELY after construction: Db::init has
+        // already resolved the path (the connection points at the scratch),
+        // and an early-return assertion must not leave the env poisoned for
+        // later slots (their ctor re-asks would resolve to the scratch).
+        qunsetenv("IST_DB_PATH");
         w.show();
         QTest::qWait(50);
         auto* table = w.findChild<QTableWidget*>(QString::fromLatin1("signalTable"));
@@ -232,7 +240,6 @@ void SmokeMain::pagerEmptyResultScratch()
         QVERIFY(!w.findChild<QPushButton*>(QString::fromLatin1("prevPageButton"))->isEnabled());
         QVERIFY(!w.findChild<QPushButton*>(QString::fromLatin1("nextPageButton"))->isEnabled());
     }
-    qunsetenv("IST_DB_PATH");
 
     // Restore the working store BEFORE removing the scratch: the open
     // connection holds the file locked on Windows (Task 1 lesson).

@@ -38,6 +38,11 @@ def test_tc016_pagination(signed):
     assert page_ids[0] == export_ids[0]
     assert page_ids == export_ids[0:len(page_ids)]
 
+    # Review Focus 5: type-ahead must land "100" on the item "100" (first
+    # prefix match in item order 50, 100, 200, 1000), never on "1000".
+    net.page_size("100")
+    assert net.page_label() == "Page 1 of 101"
+
     net.page_size("200")
     assert net.page_label() == "Page 1 of 51"
 

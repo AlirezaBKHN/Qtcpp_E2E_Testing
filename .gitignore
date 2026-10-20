@@ -20,6 +20,8 @@ skills-lock.json
 
 latex/
 
-# review-pass artifacts (local editor + smoke scratch DB)
+# review-pass artifacts (local editor + smoke scratch DBs)
 .vscode/
 smoke_users_scratch.db
+smoke_pager_scratch.db
+dbtest_cell.db
