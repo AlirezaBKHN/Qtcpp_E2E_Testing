@@ -7,16 +7,18 @@
 \usepackage{ptext}
 \usepackage{algorithm}
 \usepackage{algorithmic}
+% گزینه‌های xcolor باید پیش از tikz و قالب با مجموعه‌ی کامل بارگذاری شوند
+% تا همOption-clash رخ ندهد و هم استایل سرصفحه‌های قالب سالم بماند
+\usepackage[dvipsnames,table,svgnames]{xcolor}
 \usepackage{listings}
 \usepackage{media9}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
 \usepackage{tabularx}
 \usepackage{float}
 
-% قالب بستان؛ بارگذاری بسته‌ها و تنظیمات آن (شامل xcolor با گزینه‌هایش)
+% قالب بستان
 \input{\MyPath Boostan-Thesis}
-
-\usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning}
 
 % رنگ و تنظیمات کد پس از بارگذاری قالب
 \definecolor{codeColor}{rgb}{0.95,0.95,0.95}
