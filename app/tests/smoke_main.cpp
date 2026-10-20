@@ -845,6 +845,100 @@ void SmokeMain::reportsContract()
             confirmed = true;
     }
     QVERIFY(confirmed);
+
+    // -- Reports filter section + group share pie (spec 2026-10-20): the
+    // dashboard section's rules with reports* ids; the pie slices mirror
+    // the summary table's Rows column under the widget filters.
+    {
+        auto* section =
+            admin.findChild<QWidget*>(QString::fromLatin1("reportsFilterSection"));
+        QVERIFY2(section, "reportsFilterSection missing");
+        const auto era = Db::dataEra();
+        auto* province =
+            admin.findChild<QComboBox*>(QString::fromLatin1("reportsProvinceCombo"));
+        auto* city = admin.findChild<QComboBox*>(QString::fromLatin1("reportsCityCombo"));
+        auto* technology =
+            admin.findChild<QComboBox*>(QString::fromLatin1("reportsTechnologyCombo"));
+        auto* oper = admin.findChild<QComboBox*>(QString::fromLatin1("reportsOperatorCombo"));
+        QVERIFY(province && city && technology && oper);
+        QCOMPARE(province->itemText(0), QStringLiteral("All"));
+        auto* fromEdit =
+            admin.findChild<QDateEdit*>(QString::fromLatin1("reportsFromDateEdit"));
+        auto* toEdit = admin.findChild<QDateEdit*>(QString::fromLatin1("reportsToDateEdit"));
+        QVERIFY(fromEdit && toEdit);
+        QVERIFY(!fromEdit->calendarPopup());
+        QCOMPARE(fromEdit->displayFormat(), QStringLiteral("yyyy-MM-dd"));
+        QCOMPARE(fromEdit->date(), era.first);
+        QCOMPARE(toEdit->date(), era.second);
+        QCOMPARE(fromEdit->accessibleName(), fromEdit->text());
+        auto* searchBtn =
+            admin.findChild<QPushButton*>(QString::fromLatin1("reportsSearchButton"));
+        auto* resetBtn =
+            admin.findChild<QPushButton*>(QString::fromLatin1("reportsResetButton"));
+        QVERIFY(searchBtn && resetBtn);
+
+        // Group share pie mirrors the (Province-grouped) summary Rows.
+        auto* shareCaption =
+            admin.findChild<QLabel*>(QString::fromLatin1("groupShareCaption"));
+        auto* shareList =
+            admin.findChild<QListWidget*>(QString::fromLatin1("groupShareList"));
+        auto* shareChart =
+            admin.findChild<QChartView*>(QString::fromLatin1("groupShareChart"));
+        QVERIFY2(shareCaption && shareList && shareChart, "group share widgets missing");
+        const int tableRows = table->rowCount();
+        QCOMPARE(shareCaption->text(),
+                 QStringLiteral("Rows by Province - %1 slices").arg(tableRows));
+        QCOMPARE(shareList->count(), tableRows);
+        double pctSum = 0;
+        static const QRegularExpression rowRe(
+            QStringLiteral("^(.+): (\\d+) rows \\((\\d+\\.\\d)%\\)$"));
+        for (int i = 0; i < shareList->count(); ++i) {
+            const auto match = rowRe.match(shareList->item(i)->text());
+            QVERIFY(match.hasMatch());
+            QCOMPARE(match.captured(1), table->item(i, 0)->text());
+            QCOMPARE(match.captured(2).toInt(), table->item(i, 1)->text().toInt());
+            pctSum += match.captured(3).toDouble();
+        }
+        QVERIFY(qAbs(pctSum - 100.0) <= 0.05 * tableRows + 0.05);
+        auto* pie = qobject_cast<QPieSeries*>(shareChart->chart()->series().first());
+        QVERIFY(pie != nullptr);
+        QCOMPARE(pie->count(), tableRows);
+        for (int i = 0; i < pie->count(); ++i) {
+            QVERIFY(pie->slices().at(i)->isLabelVisible());
+            QCOMPARE(pie->slices().at(i)->labelBrush().color(), Qt::black);
+        }
+
+        // Search narrows summary + pie to the filtered aggregates.
+        province->setCurrentText(QStringLiteral("Tehran"));
+        searchBtn->click();
+        QTest::qWait(30);
+        const int tehranRows =
+            Db::queryFilters(QStringLiteral("Tehran"), QString(), QString(), QString()).size();
+        QCOMPARE(table->rowCount(), 1);
+        QCOMPARE(table->item(0, 0)->text(), QStringLiteral("Tehran"));
+        QCOMPARE(table->item(0, 1)->text().toInt(), tehranRows);
+        QCOMPARE(shareCaption->text(), QStringLiteral("Rows by Province - 1 slices"));
+        QCOMPARE(shareList->count(), 1);
+        QCOMPARE(shareList->item(0)->text(),
+                 QStringLiteral("Tehran: %1 rows (100.0%)").arg(tehranRows));
+
+        // Out-of-era dates: the pinned empty state.
+        fromEdit->setDate(QDate(2020, 1, 1));
+        toEdit->setDate(QDate(2020, 1, 2));
+        searchBtn->click();
+        QTest::qWait(30);
+        QCOMPARE(table->rowCount(), 0);
+        QCOMPARE(shareCaption->text(), QStringLiteral("Rows by Province - 0 slices"));
+        QCOMPARE(shareList->count(), 0);
+
+        // Reset restores the baseline summary.
+        resetBtn->click();
+        QTest::qWait(30);
+        QCOMPARE(table->rowCount(), Db::provinces().size());
+        QCOMPARE(fromEdit->date(), era.first);
+        QCOMPARE(shareCaption->text(),
+                 QStringLiteral("Rows by Province - %1 slices").arg(Db::provinces().size()));
+    }
 }
 
 // The chart must be readable as data, not just a graphic: per-bar value
