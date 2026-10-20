@@ -6,6 +6,10 @@ param(
     [string]$K = ''            # optional -k filter
 )
 $ErrorActionPreference = 'Stop'
+# Fixtures are the only source of truth: materialize the working db if absent.
+if (-not (Test-Path (Join-Path (Split-Path $PSScriptRoot -Parent) 'database\signaltracker.db'))) {
+    & (Join-Path $PSScriptRoot 'restore-fixture.ps1')
+}
 Set-Location (Join-Path $PSScriptRoot '..\automation')
 
 # Resolve python: pinned user-scope install wins; PATH next (skipping the

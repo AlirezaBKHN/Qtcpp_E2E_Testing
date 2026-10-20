@@ -1,7 +1,6 @@
 """Per-suite fixtures for the Iran Signal Tracker E2E suite."""
 from __future__ import annotations
 
-import shutil
 import sys
 from pathlib import Path
 
@@ -15,6 +14,7 @@ import allure  # noqa: E402
 import pytest  # noqa: E402
 
 import config as cfg  # noqa: E402
+import fixtures as dbfixtures  # noqa: E402
 from dsl.tracker import SignalTrackerDsl  # noqa: E402
 from drivers import factory  # noqa: E402
 
@@ -37,39 +37,22 @@ def _server_reachable(url: str) -> bool:
         return False
 
 
-@pytest.fixture(scope="session")
-def db_snapshot(tmp_path_factory) -> Path:
-    """One pristine copy of the committed DB per session (outside the repo).
-
-    Taken before ANY test can run so no app mutation can leak into it; the
-    committed database/signaltracker.db must stay untouched across runs.
-    """
-    factory.kill_app()
-    dest = tmp_path_factory.mktemp("istdb") / cfg.DB_PATH.name
-    shutil.copy2(cfg.DB_PATH, dest)
-    return dest
-
-
 @pytest.fixture(autouse=False)
-def isolate_db(db_snapshot: Path):
-    """Per-test isolation (owner requirement): restore the pristine DB and
-    purge the exports dir BEFORE every test - and again on teardown so the
-    tree stays clean even after the LAST test of the session.
+def isolate_db(request):
+    """Per-test isolation (owner requirement, spec 2026-10-20 C5): restore
+    AND migrate the test's mapped fixture before every test - never
+    continue on a stale db. No teardown restore: the working db is
+    git-ignored and disposable; the next test's setup is the restore point
+    for a crashed run."""
 
-    A crashed/aborted test is also covered: with fixtures, the restore point
-    is this fixture's setup of the NEXT test, not the dying test's own
-    cleanup.
-    """
-
-    def restore() -> None:
-        shutil.copy2(db_snapshot, cfg.DB_PATH)
-        cfg.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
-        for csv_file in cfg.EXPORT_DIR.glob("*.csv"):
-            csv_file.unlink()
-
-    restore()
+    nodeid = request.node.nodeid
+    mapping = dbfixtures.load_map()
+    dbfixtures.restore(dbfixtures.select_fixture(nodeid, mapping),
+                       working_db=cfg.DB_PATH)
+    cfg.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+    for csv_file in cfg.EXPORT_DIR.glob("*.csv"):
+        csv_file.unlink()
     yield
-    restore()
 
 
 @pytest.fixture(scope="session")

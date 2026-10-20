@@ -46,7 +46,8 @@ E2E_PASSWORD = "e2e123"
 ADMIN_USER = "admin"
 ADMIN_PASSWORD = "admin"
 
-# The committed DB restored before every test (per-test isolation).
+# The DISPOSABLE working db the fixture system materializes per test
+# (fixtures/ is the source of truth; see automation/fixtures.py).
 DB_PATH = Path(os.environ.get(
     "IST_DB_PATH", REPO_ROOT / "database" / "signaltracker.db"))
 
