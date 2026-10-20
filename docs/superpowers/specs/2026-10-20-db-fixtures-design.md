@@ -69,6 +69,11 @@ scratch copy.
   lives in Python (`sqlite3` is stdlib, PowerShell has no SQLite driver).
 - C4: Per-test isolation semantics are preserved: every E2E test starts from
   its mapped fixture, restored fresh (same guarantee as today's `isolate_db`).
+- C5 **[owner, 2026-10-20]**: every single test restores **and migrates** its
+  fixture — a test never continues on a stale db. No staleness optimizations
+  are permitted (no restore-only-if-changed, no session-level reuse, no
+  "migrate once per run"): the restore+copy+migrate path runs per test,
+  unconditionally.
 
 ## The parts the owner decided
 
