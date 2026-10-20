@@ -49,6 +49,7 @@ private:
 
     QTableWidget* signalTable = nullptr;
     QChartView* signalChart = nullptr;
+    QTabWidget* mainTabs = nullptr;
 
     QBarCategoryAxis* axisX = nullptr;
     QValueAxis* axisY = nullptr;

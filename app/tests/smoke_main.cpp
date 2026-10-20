@@ -4,6 +4,8 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSplitter>
+#include <QTabWidget>
+#include <QTableWidget>
 #include <QtCharts/QAbstractBarSeries>
 #include <QtCharts/QBarCategoryAxis>
 #include <QtCharts/QBarSet>
@@ -13,6 +15,7 @@
 #include "db.h"
 #include "mainwindow.h"
 #include "signin_dialog.h"
+#include "users_view.h"
 
 // Smoke: MainWindow must construct with every mandatory stable identifier,
 // each set on BOTH objectName and accessibleName (plan Global Constraints).
@@ -23,6 +26,8 @@ private slots:
     void chartShowsValueLabelsAndData();
     void signinGateBlocksMainWindow();
     void registerModeValidation();
+    void tabsAndHomeCards();
+    void usersViewAdminOnly();
 };
 
 static const char* kIds[] = {
@@ -140,6 +145,114 @@ void SmokeMain::registerModeValidation()
     QVERIFY(status != nullptr);
     QCOMPARE(status->text(), QStringLiteral("Password can not be empty."));
     QVERIFY(!d.findChild<QLabel*>(QString::fromLatin1("signinStatus"))->isVisible());
+}
+
+// Tabbed main window + home routing cards + admin gating.
+void SmokeMain::tabsAndHomeCards()
+{
+    MainWindow admin(QString::fromLatin1("admin"));
+    admin.show();
+    QTest::qWait(30);
+
+    auto* tabs = admin.findChild<QTabWidget*>(QString::fromLatin1("mainTabs"));
+    QVERIFY2(tabs, "mainTabs missing");
+    QCOMPARE(QString::fromLatin1("mainTabs"), tabs->objectName());
+    QCOMPARE(QString::fromLatin1("mainTabs"), tabs->accessibleName());
+
+    // Pinned tab order: Home, Network Data, Dashboard, Reports, Users(admin).
+    const char* pages[] = {"homeTab", "networkTab", "dashboardTab",
+                           "reportsTab", "usersTab"};
+    for (int i = 0; i < 5; ++i) {
+        QVERIFY2(tabs->widget(i) != nullptr, "missing page");
+        QCOMPARE(tabs->widget(i)->objectName(), QString::fromLatin1(pages[i]));
+        QCOMPARE(tabs->widget(i)->accessibleName(), QString::fromLatin1(pages[i]));
+    }
+    QCOMPARE(tabs->count(), 5);
+
+    auto* label = admin.findChild<QLabel*>(QString::fromLatin1("currentUserLabel"));
+    QVERIFY(label);
+    QCOMPARE(label->text(), QStringLiteral("user: admin"));
+
+    auto* logout = admin.findChild<QPushButton*>(QString::fromLatin1("logoutButton"));
+    QVERIFY(logout);
+
+    // Cards: admin sees all four.
+    for (const char* id : {"homeCardNetwork", "homeCardDashboard",
+                           "homeCardReports", "homeCardUsers"}) {
+        auto* card = admin.findChild<QPushButton*>(QString::fromLatin1(id));
+        QVERIFY2(card, qPrintable(QString("home card missing: %1").arg(id)));
+        QCOMPARE(QString::fromLatin1(id), card->objectName());
+        QCOMPARE(QString::fromLatin1(id), card->accessibleName());
+    }
+
+    // Card switching: homeCardNetwork activates the networkTab page.
+    admin.findChild<QPushButton*>(QString::fromLatin1("homeCardNetwork"))->click();
+    QCOMPARE(tabs->currentWidget()->objectName(), QStringLiteral("networkTab"));
+    QTest::qWait(10);
+    // back to home
+    tabs->setCurrentIndex(0);
+    admin.findChild<QPushButton*>(QString::fromLatin1("homeCardDashboard"))->click();
+    QCOMPARE(tabs->currentWidget()->objectName(), QStringLiteral("dashboardTab"));
+
+    // Non-admin: no Users card, no usersTab; tab order pinned (4 tabs).
+    MainWindow viewer(QString::fromLatin1("guest"));
+    viewer.show();
+    QTest::qWait(30);
+    QVERIFY(viewer.findChild<QPushButton*>(QString::fromLatin1("homeCardUsers")) == nullptr);
+    QVERIFY(viewer.findChild<QTabWidget*>(QString::fromLatin1("mainTabs"))->findChild<QWidget*>(
+                QString::fromLatin1("usersTab")) == nullptr);
+    QCOMPARE(viewer.findChild<QTabWidget*>(QString::fromLatin1("mainTabs"))->count(), 4);
+    QCOMPARE(viewer.findChild<QTabWidget*>(QString::fromLatin1("mainTabs"))
+                 ->widget(3)->objectName(), QString::fromLatin1("reportsTab"));
+    QCOMPARE(viewer.findChild<QLabel*>(QString::fromLatin1("currentUserLabel"))->text(),
+             QStringLiteral("user: guest"));
+}
+
+// Users tab: sorted usernames, remove only for admin, admin self-removal guard.
+void SmokeMain::usersViewAdminOnly()
+{
+    // Scratch DB so the committed database/signaltracker.db stays pristine.
+    const QString scratch = QStringLiteral("smoke_users_scratch.db");
+    QFile::remove(scratch);
+    QVERIFY(Db::init(scratch));
+    QVERIFY(Db::registerUser(QStringLiteral("smoke_temp"), QStringLiteral("pw123")));
+    QStringList expected = Db::usernames();
+    QCOMPARE(expected.size(), 4);
+
+    {
+        UsersView adminView(QString::fromLatin1("admin"));
+        adminView.show();
+        auto* table = adminView.findChild<QTableWidget*>(QString::fromLatin1("usersTable"));
+        QVERIFY(table);
+        QCOMPARE(table->rowCount(), expected.size());
+        for (int r = 0; r < expected.size(); ++r)
+            QCOMPARE(table->item(r, 0)->text(), expected.at(r));
+        auto* btn = adminView.findChild<QPushButton*>(QString::fromLatin1("removeUserButton"));
+        QVERIFY(btn);
+        QVERIFY(btn->isEnabled());
+
+        // Self-removal guard: 'admin' can never go.
+        table->selectRow(expected.indexOf(QStringLiteral("admin")));
+        btn->click();
+        QVERIFY(Db::usernames().contains(QStringLiteral("admin")));
+
+        // Real removal of a non-admin one-off.
+        table->selectRow(Db::usernames().indexOf(QStringLiteral("smoke_temp")));
+        btn->click();
+        QVERIFY(!Db::usernames().contains(QStringLiteral("smoke_temp")));
+        QCOMPARE(table->rowCount(), 3);
+        // Every remaining name matches the table.
+        for (int r = 0; r < 3; ++r)
+            QVERIFY(Db::usernames().contains(table->item(r, 0)->text()));
+    }
+    {
+        UsersView viewerView(QString::fromLatin1("guest"));
+        viewerView.show();
+        auto* btn = viewerView.findChild<QPushButton*>(QString::fromLatin1("removeUserButton"));
+        QVERIFY(btn);
+        QVERIFY2(!btn->isEnabled(), "removeUserButton must be disabled for non-admin");
+    }
+    QFile::remove(scratch);
 }
 
 // The chart must be readable as data, not just a graphic: per-bar value

@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "users_view.h"
 
 #include <QtCharts/QBarCategoryAxis>
 #include <QtCharts/QBarSeries>
@@ -13,8 +14,11 @@
 #include <QFont>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QLabel>
 #include <QPushButton>
 #include <QSplitter>
+#include <QTabWidget>
+#include <QTableWidget>
 #include <QVBoxLayout>
 
 #include "db.h"
@@ -142,7 +146,7 @@ MainWindow::MainWindow(const QString& user, QWidget* parent)
     chartRow->addWidget(chartGroupBy);
     chartRow->addWidget(signalChart, 1);
 
-    // -- Assembly -----------------------------------------------------------
+    // -- Assembly: tabbed main window ---------------------------------------
     auto* splitter = new QSplitter(Qt::Vertical, this);
     splitter->addWidget(signalTable);
 
@@ -156,10 +160,80 @@ MainWindow::MainWindow(const QString& user, QWidget* parent)
     // elided to "…" (screenshot evidence). 380/260 keeps the plot readable.
     splitter->setSizes({380, 260});
 
+    // Top bar: current-user readout + logout.
+    auto* currentUserLabel =
+        qobject_cast<QLabel*>(makeStable(new QLabel(this), "currentUserLabel"));
+    currentUserLabel->setText(QStringLiteral("user: ") + currentUser_);
+    auto* logoutButton =
+        qobject_cast<QPushButton*>(makeStable(new QPushButton(tr("Log out"), this),
+                                              "logoutButton"));
+    connect(logoutButton, &QPushButton::clicked, this, &MainWindow::onLogout);
+
+    auto* topBar = new QHBoxLayout;
+    topBar->addWidget(currentUserLabel);
+    topBar->addStretch(1);
+    topBar->addWidget(logoutButton);
+
+    // -- Network Data page: the original central layout, verbatim.
+    QWidget* networkPage = makeStable(new QWidget(this), "networkTab");
+    auto* networkLayout = new QVBoxLayout(networkPage);
+    networkLayout->addLayout(filterRow);
+    networkLayout->addWidget(splitter, 1);
+
+    // Dashboard/Reports arrive in Tasks 5/6; placeholders pin the tab order
+    // now (replaced in place, never reordered).
+    QWidget* homePage = makeStable(new QWidget(this), "homeTab");
+    QWidget* dashboardPage = makeStable(new QWidget(this), "dashboardTab");
+    QWidget* reportsPage = makeStable(new QWidget(this), "reportsTab");
+
+    // -- Home: routing cards.
+    auto* cardsRow = new QHBoxLayout;
+    const std::initializer_list<QPair<const char*, QPair<int, const char*>>> cards = {
+        {"homeCardNetwork", {1, "Network Data"}},
+        {"homeCardDashboard", {2, "Dashboard"}},
+        {"homeCardReports", {3, "Reports"}},
+    };
+    for (const auto& [id, target] : cards) {
+        auto* card = qobject_cast<QPushButton*>(makeStable(
+            new QPushButton(QString::fromLatin1(target.second), homePage), id));
+        const int index = target.first;
+        connect(card, &QPushButton::clicked, this, [this, index] {
+            mainTabs->setCurrentIndex(index);
+        });
+        cardsRow->addWidget(card);
+    }
+    if (currentUser_ == QLatin1String("admin")) {
+        auto* card = qobject_cast<QPushButton*>(makeStable(
+            new QPushButton(tr("Users"), homePage), "homeCardUsers"));
+        const int index = 4;
+        connect(card, &QPushButton::clicked, this, [this, index] {
+            mainTabs->setCurrentIndex(index);
+        });
+        cardsRow->addWidget(card);
+    }
+    cardsRow->addStretch(1);
+    auto* homeLayout = new QVBoxLayout(homePage);
+    homeLayout->addLayout(cardsRow);
+    homeLayout->addStretch(1);
+
+    mainTabs = qobject_cast<QTabWidget*>(makeStable(new QTabWidget(this), "mainTabs"));
+    mainTabs->addTab(homePage, tr("Home"));
+    mainTabs->addTab(networkPage, tr("Network Data"));
+    mainTabs->addTab(dashboardPage, tr("Dashboard"));
+    mainTabs->addTab(reportsPage, tr("Reports"));
+    if (currentUser_ == QLatin1String("admin"))
+        mainTabs->addTab(new UsersView(currentUser_, this), tr("Users"));
+    // The usersTab page id is pinned on the mounted view (admin only).
+    if (currentUser_ == QLatin1String("admin")) {
+        QWidget* usersPage = mainTabs->widget(4);
+        if (usersPage && usersPage->objectName().isEmpty())
+            makeStable(usersPage, "usersTab");
+    }
+
     auto* central = new QWidget(this);
     auto* centralLayout = new QVBoxLayout(central);
-    centralLayout->addLayout(filterRow);
-    centralLayout->addWidget(splitter, 1);
+    centralLayout->addLayout(topBar);
+    centralLayout->addWidget(mainTabs, 1);
     setCentralWidget(central);
 
     statusBar()->showMessage(tr("Ready"));
