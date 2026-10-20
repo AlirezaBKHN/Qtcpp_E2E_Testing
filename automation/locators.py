@@ -93,6 +93,13 @@ for _key in SPINNER_IDS:
     CONTROLS[_key] = [(C.BY_XPATH, XPATH_BY_AID_SPINNER % _key),
                       (C.BY_NAME, _key), (C.BY_ID, _key)]
 
+# Captions (spec 2026-10-20): plain QLabels whose UIA Name is the
+# DISPLAYED TEXT ("Cells by operator - 4 slices") - addressed by an
+# AutomationId contains-XPath over Text elements, never by Name.
+XPATH_BY_AID_TEXT = "//Text[contains(@AutomationId,'%s')]"
+for _key in ("operatorShareCaption", "techQualityCaption", "groupShareCaption"):
+    CONTROLS[_key] = [(C.BY_XPATH, XPATH_BY_AID_TEXT % _key)]
+
 # Status-bar readout ('Showing N rows'): its Name mirrors the live text, so
 # it is addressed by an XPath prefix-match; the handle is cached like every
 # other control and get_attribute("Name") reads the CURRENT text (live

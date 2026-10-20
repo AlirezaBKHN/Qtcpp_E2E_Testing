@@ -4,6 +4,7 @@ from __future__ import annotations
 import config as C
 from dsl.export_result import ExportResult
 from pageobjects.resolve_element import find
+from pageobjects.reports_view import ReportsView
 from pageobjects.summary_table import SummaryTable
 
 GROUP_COLUMNS = ("Province", "Operator", "Technology")
@@ -13,6 +14,7 @@ class ReportsDsl:
     def __init__(self, driver, route_home):
         self._driver = driver
         self._table = SummaryTable(driver)
+        self._reports = ReportsView(driver)
         route_home("homeCardReports")
 
     def _el(self, control: str):
@@ -31,6 +33,60 @@ class ReportsDsl:
         """Select a summary row to drive the drill-down trend chart."""
         self._table.click_row(row)
         return self
+
+    # -- filter section (spec 2026-10-20) ---------------------------------
+    def province(self, value: str) -> "ReportsDsl":
+        self._reports.select_combo("reportsProvinceCombo", value)
+        return self
+
+    def city(self, value: str) -> "ReportsDsl":
+        self._reports.select_combo("reportsCityCombo", value)
+        return self
+
+    def technology(self, value: str) -> "ReportsDsl":
+        self._reports.select_combo("reportsTechnologyCombo", value)
+        return self
+
+    def operator_name(self, value: str) -> "ReportsDsl":
+        self._reports.select_combo("reportsOperatorCombo", value)
+        return self
+
+    def from_date(self, value: str) -> "ReportsDsl":
+        self._reports.set_date("reportsFromDateEdit", value)
+        return self
+
+    def to_date(self, value: str) -> "ReportsDsl":
+        self._reports.set_date("reportsToDateEdit", value)
+        return self
+
+    def search(self) -> "ReportsDsl":
+        self._reports.search()
+        return self
+
+    def reset(self) -> "ReportsDsl":
+        self._reports.reset()
+        return self
+
+    def from_date_text(self) -> str:
+        """The reports from-date readout's displayed text."""
+        return self._reports.from_date_text()
+
+    def to_date_text(self) -> str:
+        """The reports to-date readout's displayed text."""
+        return self._reports.to_date_text()
+
+    # -- group share pie (the TEST asserts) --------------------------------
+    def group_slices(self) -> list[tuple[str, int, float]]:
+        """Group pie slices as (label, row count, percent)."""
+        return self._reports.group_slices()
+
+    def caption_text(self, control: str) -> str:
+        """A caption's full text ('Rows by Province - 31 slices')."""
+        return self._reports.caption_text(control)
+
+    def list_items(self, control: str) -> list[str]:
+        """Raw item texts of the groupShareList readout."""
+        return self._reports.list_items(control)
 
     # -- readers (the TEST asserts) ------------------------------------
     def summary_rows(self) -> int:

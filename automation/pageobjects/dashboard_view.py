@@ -9,7 +9,10 @@ import re
 import time
 
 from drivers import keyboard
+from pageobjects.date_edit import set_date
+from pageobjects.filter_section import FilterSection
 from pageobjects.main_page import MainPage
+from pageobjects.readout_list import ReadoutList
 from pageobjects.resolve_element import find, read_text
 
 KPI_IDS = {
@@ -30,9 +33,15 @@ def _caption_number(driver, contains: str, pattern: str, fail: str) -> int:
     raise AssertionError(fail)
 
 
+# Pinned readout formats (plan Global Constraints).
+SLICE_RE = re.compile(r"^(.+): (\d+) cells \((\d+\.\d)%\)$")
+GROUP_RE = re.compile(r"^(.+): (\d+\.\d)%$")
+
+
 class DashboardView:
     def __init__(self, driver):
         self._driver = driver
+        self._filters = FilterSection(driver, "dashboardFilterSection")
 
     def kpi(self, name: str) -> str:
         """Text of a KPI readout; keys per KPI_IDS."""
@@ -64,19 +73,8 @@ class DashboardView:
 
     # -- filter section (spec 2026-10-20) --------------------------------
     def set_date(self, control: str, date: str) -> None:
-        """Set a QDateEdit (YYYY-MM-DD) via WAD element-targeted send_keys.
-
-        Pinned recipe (fresh-state probe, tools/probe_date_fresh.py E1):
-        WAD send_keys UIA-focuses the element, focus lands on the YEAR
-        section, and the 8 digits auto-advance year -> month -> day.
-        OS-level keybd_event digits DO NOT land (probe E3: value unchanged)
-        and are not used. The 'send_keys APPENDS' WAD quirk does not apply
-        to section-typed date edits, but the recipe assumes the edit
-        carries no in-progress typing state (fresh app or after Reset).
-        """
-        el = find(self._driver, control)
-        el.send_keys(date.replace("-", ""))
-        time.sleep(0.3)              # date-changed settle
+        """Set a QDateEdit (YYYY-MM-DD) via the pinned send_keys recipe."""
+        set_date(self._driver, control, date)
 
     def from_date_text(self) -> str:
         """The from-date readout's displayed text ('YYYY-MM-DD')."""
@@ -85,3 +83,40 @@ class DashboardView:
     def to_date_text(self) -> str:
         """The to-date readout's displayed text ('YYYY-MM-DD')."""
         return read_text(find(self._driver, "dashboardToDateEdit"))
+
+    # -- filter actions ---------------------------------------------------
+    def select_combo(self, control: str, value: str) -> None:
+        self._filters.select_combo(control, value)
+
+    def search(self) -> None:
+        self._filters.click("dashboardSearchButton")
+
+    def reset(self) -> None:
+        self._filters.click("dashboardResetButton")
+
+    # -- share chart data surfaces ----------------------------------------
+    def list_items(self, control: str) -> list[str]:
+        return ReadoutList(self._driver, control).items()
+
+    def pie_slices(self) -> list[tuple[str, int, float]]:
+        """Operator pie slices as (label, count, percent) - from the list."""
+        slices = []
+        for text in self.list_items("operatorShareList"):
+            match = SLICE_RE.match(text)
+            assert match, f"operatorShareList item format: {text!r}"
+            slices.append((match.group(1), int(match.group(2)),
+                           float(match.group(3))))
+        return slices
+
+    def bar_groups(self) -> list[tuple[str, float]]:
+        """Technology bar values as (label, percent) - from the list."""
+        groups = []
+        for text in self.list_items("techQualityList"):
+            match = GROUP_RE.match(text)
+            assert match, f"techQualityList item format: {text!r}"
+            groups.append((match.group(1), float(match.group(2))))
+        return groups
+
+    def caption_text(self, control: str) -> str:
+        """A caption's full text (Name = displayed text)."""
+        return read_text(find(self._driver, control))
