@@ -19,3 +19,7 @@ skills-lock.json
 .superpowers/
 
 latex/
+
+# review-pass artifacts (local editor + smoke scratch DB)
+.vscode/
+smoke_users_scratch.db

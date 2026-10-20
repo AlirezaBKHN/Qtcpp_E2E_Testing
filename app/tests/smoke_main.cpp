@@ -30,6 +30,7 @@ private slots:
     void chartShowsValueLabelsAndData();
     void signinGateBlocksMainWindow();
     void registerModeValidation();
+    void registerSuccessReturnsToLoginScratch();
     void tabsAndHomeCards();
     void usersViewAdminOnly();
     void dashboardContract();
@@ -222,6 +223,47 @@ void SmokeMain::registerModeValidation()
     QCOMPARE(status->text(), QStringLiteral("Password can not be empty."));
     QCOMPARE(status->accessibleName(), status->text());
     QVERIFY(!d.findChild<QLineEdit*>(QString::fromLatin1("signinStatus"))->isVisible());
+}
+
+// Register success (plan Task 3 pin): the dialog returns to the LOGIN
+// screen carrying the pinned copy on the login readout, with the fields
+// cleared (probed state machine; E2E TC011 pins the same loop through the
+// DSL). Scratch DB so the committed store stays pristine.
+void SmokeMain::registerSuccessReturnsToLoginScratch()
+{
+    const QString scratch = QStringLiteral("smoke_users_scratch.db");
+    QFile::remove(scratch);
+    QVERIFY(Db::init(scratch));
+
+    SignInDialog d;
+    d.show();
+    auto* toggle = d.findChild<QPushButton*>(QString::fromLatin1("registerToggle"));
+    QVERIFY(toggle != nullptr);
+    toggle->click();
+
+    auto* username = d.findChild<QLineEdit*>(QString::fromLatin1("usernameField"));
+    auto* password = d.findChild<QLineEdit*>(QString::fromLatin1("passwordField"));
+    QVERIFY(username && password);
+    username->setText(QStringLiteral("smoke_reg_success"));
+    password->setText(QStringLiteral("pw123456"));
+
+    auto* registerButton =
+        d.findChild<QPushButton*>(QString::fromLatin1("registerButton"));
+    QVERIFY(registerButton != nullptr);
+    registerButton->click();
+
+    // Back on the login screen: register controls hidden, the login
+    // readout carries the pinned copy, fields cleared.
+    QVERIFY2(!registerButton->isVisible(),
+             "register success did not return to the login screen");
+    auto* signin = d.findChild<QLineEdit*>(QString::fromLatin1("signinStatus"));
+    QVERIFY(signin != nullptr);
+    QCOMPARE(signin->text(), QStringLiteral("Registered \u2014 log in."));
+    QCOMPARE(signin->accessibleName(), signin->text());
+    QCOMPARE(username->text(), QString());
+    QCOMPARE(password->text(), QString());
+
+    QFile::remove(scratch);
 }
 
 // Tabbed main window + home routing cards + admin gating.

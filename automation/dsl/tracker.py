@@ -31,7 +31,7 @@ from dsl.users import UsersDsl
 from pageobjects.signin_page import SignInPage
 from pageobjects.tabs_bar import TabsBar
 
-_SIGNIN_WINDOW_TITLE = factory._SIGNIN_WINDOW_TITLE
+_SIGNIN_WINDOW_TITLE = factory.SIGNIN_WINDOW_TITLE
 _MAIN_WINDOW_TITLE = factory._MAIN_WINDOW_TITLE
 
 
@@ -107,7 +107,7 @@ class SignalTrackerDsl:
         self._signin.click_login()
         deadline = time.time() + 15
         while time.time() < deadline:
-            if factory._find_window(_MAIN_WINDOW_TITLE):
+            if factory.find_window(_MAIN_WINDOW_TITLE):
                 self._attach_phase(_MAIN_WINDOW_TITLE)
                 return  # main window phase
             time.sleep(0.3)

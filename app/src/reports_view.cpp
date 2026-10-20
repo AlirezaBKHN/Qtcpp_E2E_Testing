@@ -25,8 +25,6 @@ QWidget* makeStable(QWidget* widget, const char* id)
     return widget;
 }
 
-constexpr int kDayBuckets = 7;
-
 QString groupColumnForGroupText(const QString& group)
 {
     if (group == QLatin1String("Operator"))
@@ -135,7 +133,7 @@ void ReportsView::refreshSummary()
                 dBm = labelAvg.second;
                 break;
             }
-        const double quality = (dBm + 120.0) / 0.7;
+        const double quality = Db::qualityFrom(dBm);
         reportTable->setItem(r, 2, new QTableWidgetItem(QString::number(quality, 'f', 1)));
     }
     reportTable->setSortingEnabled(true);

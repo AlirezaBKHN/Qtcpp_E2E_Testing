@@ -1,21 +1,18 @@
 """Reports tab DSL: group summary + drill-down + report export."""
 from __future__ import annotations
 
-from math import ceil
-
 import config as C
 from dsl.export_result import ExportResult
-from pageobjects.main_page import MainPage
 from pageobjects.resolve_element import find
-from pageobjects.signin_page import _read_text
+from pageobjects.summary_table import SummaryTable
 
-COLUMNS_PER_ROW = 3  # Label / Rows / Avg Quality
+GROUP_COLUMNS = ("Province", "Operator", "Technology")
 
 
 class ReportsDsl:
     def __init__(self, driver, route_home):
         self._driver = driver
-        self._main = MainPage(driver)
+        self._table = SummaryTable(driver)
         route_home("homeCardReports")
 
     def _el(self, control: str):
@@ -24,47 +21,25 @@ class ReportsDsl:
     # -- actions -------------------------------------------------------
     def group_by(self, value: str) -> "ReportsDsl":
         """Select the group column via keyboard type-ahead (WAD quirk)."""
-        mapping = {"Province": "Province", "Operator": "Operator",
-                   "Technology": "Technology"}
-        try:
-            text = mapping[value]
-        except KeyError as exc:
+        if value not in GROUP_COLUMNS:
             raise KeyError(
-                f"unknown report group {value!r}; known: {sorted(mapping)}") from exc
-        self._el("reportGroupBy").send_keys(text)
+                f"unknown report group {value!r}; known: {sorted(GROUP_COLUMNS)}")
+        self._el("reportGroupBy").send_keys(value)
         return self
 
     def select_row(self, row: int) -> "ReportsDsl":
-        """Select a summary row to drive the drill-down trend chart.
-
-        Realized cells are row-major (3 per row, headers excluded); this is
-        a 10-row summary table, so all rows stay realized.
-        """
-        table = self._el("reportTable")
-        items = table.find_elements("xpath", ".//DataItem")
-        cell_index = row * COLUMNS_PER_ROW
-        if cell_index >= len(items):
-            raise AssertionError(
-                f"report row {row} not realized; realized cells: {len(items)}")
-        items[cell_index].click()
+        """Select a summary row to drive the drill-down trend chart."""
+        self._table.click_row(row)
         return self
 
     # -- readers (the TEST asserts) ------------------------------------
     def summary_rows(self) -> int:
-        """Number of data rows in the summary table (ceil of realized cells)."""
-        table = self._el("reportTable")
-        items = table.find_elements("xpath", ".//DataItem")
-        return ceil(len(items) / COLUMNS_PER_ROW)
+        """Number of data rows in the summary table."""
+        return self._table.row_count()
 
     def row_label(self, row: int) -> str:
         """Label text of the given summary row."""
-        table = self._el("reportTable")
-        items = table.find_elements("xpath", ".//DataItem")
-        cell_index = row * COLUMNS_PER_ROW
-        if cell_index >= len(items):
-            raise AssertionError(
-                f"report row {row} not realized; realized cells: {len(items)}")
-        return _read_text(items[cell_index])
+        return self._table.row_label(row)
 
     # -- export ---------------------------------------------------------
     def export(self) -> ExportResult:

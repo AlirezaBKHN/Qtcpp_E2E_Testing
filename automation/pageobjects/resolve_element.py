@@ -102,3 +102,23 @@ def find_within(driver, section: str, control: str):
             print(f"[find {control} within {section}: MISS "
                   f"{time.time() - t0:.2f}s]", file=sys.stderr, flush=True)
     return find(driver, control)  # root fallback (raises if truly absent)
+
+
+def read_text(el) -> str:
+    """Read a control's displayed text through whatever UIA surface has it.
+
+    Readout widgets keep the stable id in objectName/AutomationId and mirror
+    the displayed text in the accessibleName - which is the UIA Name, the
+    only readable surface WAD offers (probed: no attribute key can read a
+    QLineEdit's content - Value/HelpText/Text all None). Plain QLabels
+    (captions) expose their text as the Name directly. The Qt fallback for
+    an ID-less QLineEdit is the class name, filtered here.
+    """
+    for attr in ("Value", "HelpText", "Name"):
+        try:
+            value = el.get_attribute(attr)
+        except Exception:  # noqa: BLE001 - attribute may be unsupported
+            value = None
+        if value and value not in ("QLineEdit", "QLabel", "QTextEdit"):
+            return value
+    return ""

@@ -238,6 +238,13 @@ bool Db::removeUser(const QString& username)
     return q.numRowsAffected() > 0;
 }
 
+double Db::qualityFrom(double avgDbm)
+{
+    // The shared 0..100 quality metric (seed domain: -120..-50 dBm maps to
+    // 0..100). Single source of truth - UI and Db both call this.
+    return (avgDbm + 120.0) / 0.7;
+}
+
 double Db::networkQuality()
 {
     QSqlQuery q(QSqlDatabase::database());
@@ -245,7 +252,7 @@ double Db::networkQuality()
     q.exec();
     if (!q.next())
         return 0.0;
-    return (q.value(0).toDouble() + 120.0) / 0.7;
+    return qualityFrom(q.value(0).toDouble());
 }
 
 int Db::cellCount()
@@ -286,7 +293,7 @@ QVector<LabelAvg> Db::dailyQuality(const QString& groupColumn,
     q.exec();
     while (q.next())
         points.append({q.value(0).toString(),
-                       (q.value(1).toDouble() + 120.0) / 0.7});
+                       qualityFrom(q.value(1).toDouble())});
     return points;
 }
 

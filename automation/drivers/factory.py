@@ -31,7 +31,7 @@ _process = None  # the app process we own in this session
 
 _LINGERING_APP = "IranSignalTracker.exe"
 
-_SIGNIN_WINDOW_TITLE = "Sign in - Iran Signal Tracker"
+SIGNIN_WINDOW_TITLE = "Sign in - Iran Signal Tracker"
 _MAIN_WINDOW_TITLE = "Iran Signal Tracker"
 
 # Title of the window the CURRENT session is attached to (page-object
@@ -61,7 +61,7 @@ def _start_app() -> None:
     _process = subprocess.Popen([str(C.APP_EXE)])
 
 
-def _find_window(title: str) -> int:
+def find_window(title: str) -> int:
     return ctypes.windll.user32.FindWindowW(None, title)
 
 
@@ -69,7 +69,7 @@ def wait_hwnd(title: str, timeout: float = 30.0) -> int:
     """Poll for a top-level window with the exact title; return its HWND."""
     deadline = time.time() + timeout
     while time.time() < deadline:
-        hwnd = _find_window(title)
+        hwnd = find_window(title)
         if hwnd:
             return hwnd
         time.sleep(0.3)
@@ -146,7 +146,7 @@ def get_driver():
     New code should call attach(<title>) explicitly (phases matter with the
     auth gate); this stays for tools that only need the sign-in screen.
     """
-    return attach(_SIGNIN_WINDOW_TITLE)
+    return attach(SIGNIN_WINDOW_TITLE)
 
 
 def quit_driver() -> None:

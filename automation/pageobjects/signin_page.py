@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 
-from pageobjects.resolve_element import find
+from pageobjects.resolve_element import find, read_text
 
 
 def read_visible_text(driver, control_ids) -> str:
@@ -23,29 +23,9 @@ def read_visible_text(driver, control_ids) -> str:
                 continue
         except Exception:  # noqa: BLE001 - displayed check unsupported: keep
             pass
-        text = _read_text(el)
+        text = read_text(el)
         if text and text != control_id:
             return text
-    return ""
-
-
-def _read_text(el) -> str:
-    """Read a control's displayed text through whatever UIA surface has it.
-
-    Readout widgets keep the stable id in objectName/AutomationId and mirror
-    the displayed text in the accessibleName - which is the UIA Name, the
-    only readable surface WAD offers (probed: no attribute key can read a
-    QLineEdit's content - Value/HelpText/Text all None). Plain QLabels
-    (captions) expose their text as the Name directly. The Qt fallback for
-    an ID-less QLineEdit is the class name, filtered here.
-    """
-    for attr in ("Value", "HelpText", "Name"):
-        try:
-            value = el.get_attribute(attr)
-        except Exception:  # noqa: BLE001 - attribute may be unsupported
-            value = None
-        if value and value not in ("QLineEdit", "QLabel", "QTextEdit"):
-            return value
     return ""
 
 
@@ -71,8 +51,6 @@ def _set_text(el, text: str) -> None:
 
 class SignInPage:
     """Owns every interaction on the signinWindow."""
-
-    SIGNIN_XPATH = "//*[contains(@Name,'signinWindow') or contains(@AutomationId,'signinWindow')]"
 
     def __init__(self, driver):
         self._driver = driver

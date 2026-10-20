@@ -55,7 +55,10 @@ public:
     // The literal 'admin' account can never be removed; unknown users fail too.
     static bool removeUser(const QString& username);
 
-    // Dashboard aggregates (quality = (avg dBm + 120) / 0.7 on a 0..100 scale).
+    // Dashboard aggregates. qualityFrom is THE definition of the shared
+    // 0..100 quality metric ((avg dBm + 120) / 0.7); every quality number
+    // in UI or tests derives through it - never inline the transform.
+    static double qualityFrom(double avgDbm);
     static double networkQuality();
     static int cellCount();
     // (YYYY-MM-DD, quality) pairs ascending; groupColumn must be one of

@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 from pageobjects.main_page import MainPage
-from pageobjects.resolve_element import find, find_within
-from pageobjects.signin_page import _read_text
+from pageobjects.resolve_element import find, find_within, read_text
 
 WINDOW_XPATH = MainPage.WINDOW_XPATH
 
@@ -20,7 +19,7 @@ class TabsBar:
     """Home-card based navigation and top-bar readouts.
 
     Cards live on the homeTab, so navigation is always performed from Home:
-    the DSL resets the tab to Home before routing (see tracker.go_home()).
+    the DSL resets the tab to Home before routing (tracker's _route_home).
     """
 
     def __init__(self, driver):
@@ -59,4 +58,4 @@ class TabsBar:
             el = find_within(self._driver, "headerSection", "currentUserLabel")
         except Exception:  # noqa: BLE001 - absent after logout
             return ""
-        return _read_text(el)
+        return read_text(el)
