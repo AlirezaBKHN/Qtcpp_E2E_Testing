@@ -81,18 +81,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
+      # 3.14 on purpose: install-qt-action runs its own internal setup-python
+      # with '>=3.14.0' and prepends it to PATH - aligning on the SAME
+      # interpreter avoids the 'python has no pytest' mismatch (observed on
+      # the first spike run). Deps install AFTER the Qt step (see below).
+      - name: Set up Python 3.14
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.14'
           cache: pip
           cache-dependency-path: automation/requirements.txt
-
-      - name: Install test deps + Allure CLI
-        shell: pwsh
-        run: |
-          pip install -r automation\requirements.txt
-          npm install -g allure@3.21.0
 
       - name: Install CMake 3.30.5 + Ninja
         uses: lukka/get-cmake@v4.4.4
@@ -126,6 +124,15 @@ jobs:
           Add-Content $env:GITHUB_ENV "IST_GXX=$($gxx.FullName)"
           Add-Content $env:GITHUB_ENV "IST_CMAKE=$((Get-Command cmake.exe).Source)"
           Add-Content $env:GITHUB_ENV "IST_NINJA=$((Get-Command ninja.exe).Source)"
+
+      # AFTER install-qt-action: its internal setup-python (>=3.14.0) has
+      # already reshaped PATH, so python -m pip binds to the same
+      # interpreter pytest will run under.
+      - name: Install test deps + Allure CLI
+        shell: pwsh
+        run: |
+          python -m pip install -r automation\requirements.txt
+          npm install -g allure@3.21.0
 
       - name: Build + deploy Qt runtime
         shell: pwsh
