@@ -68,4 +68,11 @@ private:
     QTableWidget* worstCellsList = nullptr;
     QDateTimeAxis* timeAxis = nullptr;
     QValueAxis* qualityAxis = nullptr;
+
+    // Operator share pie + its readable surfaces: caption carries the
+    // slice count (Name = text), the one-column list mirrors each slice's
+    // pinned "label: N cells (P.P%)" text - WAD cannot read chart series.
+    QLabel* operatorShareCaption = nullptr;
+    QChartView* operatorShareChart = nullptr;
+    QListWidget* operatorShareList = nullptr;
 };

@@ -13,7 +13,10 @@
 #include <QtCharts/QChartView>
 #include <QtCharts/QDateTimeAxis>
 #include <QtCharts/QLineSeries>
+#include <QtCharts/QPieSeries>
 #include <QtCharts/QValueAxis>
+#include <QListWidget>
+#include <QRegularExpression>
 #include <QtTest>
 #include <QtSql/QSqlDatabase>
 #include <QtSql/QSqlQuery>
@@ -556,6 +559,51 @@ void SmokeMain::dashboardContract()
     QCOMPARE(worstList->rowCount(), 8);
     QVERIFY(worstList->rowCount() >= 1);
 
+    // -- Operator share pie (spec 2026-10-20): slices = countBy under the
+    // CURRENT widget filters; the readable surface is the caption (slice
+    // count) and the one-column list (pinned item format), because WAD
+    // cannot see inside chart series.
+    {
+        auto* shareCaption =
+            admin.findChild<QLabel*>(QString::fromLatin1("operatorShareCaption"));
+        auto* shareList =
+            admin.findChild<QListWidget*>(QString::fromLatin1("operatorShareList"));
+        auto* shareChart =
+            admin.findChild<QChartView*>(QString::fromLatin1("operatorShareChart"));
+        QVERIFY2(shareCaption && shareList && shareChart,
+                 "operator share widgets missing");
+
+        const auto counts =
+            Db::countBy("operator", QString(), QString(), QString(), QString());
+        const int total = Db::cellCount();
+        QCOMPARE(shareCaption->text(),
+                 QStringLiteral("Cells by operator - %1 slices").arg(counts.size()));
+        QCOMPARE(shareList->count(), counts.size());
+        double pctSum = 0;
+        static const QRegularExpression itemRe(
+            QStringLiteral("^(.+): (\\d+) cells \\((\\d+\\.\\d)%\\)$"));
+        for (int i = 0; i < counts.size(); ++i) {
+            const auto match = itemRe.match(shareList->item(i)->text());
+            QVERIFY(match.hasMatch());
+            QCOMPARE(match.captured(1), counts.at(i).first);
+            QCOMPARE(match.captured(2).toInt(), counts.at(i).second);
+            const double pct = 100.0 * counts.at(i).second / total;
+            QCOMPARE(match.captured(3), QString::number(pct, 'f', 1));
+            pctSum += match.captured(3).toDouble();
+        }
+        // Rounded percents drift; pin the tolerance, not exact 100.
+        QVERIFY(qAbs(pctSum - 100.0) <= 0.05 * counts.size() + 0.05);
+
+        auto* pie = qobject_cast<QPieSeries*>(shareChart->chart()->series().first());
+        QVERIFY(pie != nullptr);
+        QCOMPARE(shareChart->chart()->series().size(), 1);
+        QCOMPARE(pie->count(), counts.size());
+        for (int i = 0; i < pie->count(); ++i) {
+            QVERIFY(pie->slices().at(i)->isLabelVisible());
+            QCOMPARE(pie->slices().at(i)->labelBrush().color(), Qt::black);
+        }
+    }
+
     // -- Filter section (spec 2026-10-20): same combo populations as the
     // network tab, era-defaulted date pair, Search applies, Reset restores.
     auto* section = admin.findChild<QWidget*>(QString::fromLatin1("dashboardFilterSection"));
@@ -629,6 +677,21 @@ void SmokeMain::dashboardContract()
     QVERIFY(cityItems.first() == QStringLiteral("All"));
     QVERIFY(cityItems.contains(QStringLiteral("Shiraz")));
 
+    // The pie follows the filter: Fars-only slices summing to the filtered
+    // row count.
+    {
+        const auto counts =
+            Db::countBy("operator", QStringLiteral("Fars"), QString(), QString(), QString());
+        QCOMPARE(admin.findChild<QLabel*>(QString::fromLatin1("operatorShareCaption"))->text(),
+                 QStringLiteral("Cells by operator - %1 slices").arg(counts.size()));
+        auto* shareList = admin.findChild<QListWidget*>(QString::fromLatin1("operatorShareList"));
+        QCOMPARE(shareList->count(), counts.size());
+        int sum = 0;
+        for (int i = 0; i < counts.size(); ++i)
+            sum += counts.at(i).second;
+        QCOMPARE(sum, farsRows);
+    }
+
     // Out-of-era dates: the pinned empty state - zero groups leave the
     // best/worst operator readouts EMPTY, never stale or garbage.
     fromEdit->setDate(QDate(2020, 1, 1));
@@ -643,6 +706,9 @@ void SmokeMain::dashboardContract()
     QCOMPARE(trendCaption->text(), QStringLiteral("Daily quality trend - 0 points"));
     QCOMPARE(worstCaption->text(), QStringLiteral("Weakest cells - 0 rows"));
     QCOMPARE(worstList->rowCount(), 0);
+    QCOMPARE(admin.findChild<QLabel*>(QString::fromLatin1("operatorShareCaption"))->text(),
+             QStringLiteral("Cells by operator - 0 slices"));
+    QCOMPARE(admin.findChild<QListWidget*>(QString::fromLatin1("operatorShareList"))->count(), 0);
 
     // Reset restores All + era defaults and re-queries.
     resetBtn->click();

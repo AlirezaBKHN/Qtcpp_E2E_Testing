@@ -3,6 +3,7 @@
 #include <QtCharts/QChart>
 #include <QtCharts/QDateTimeAxis>
 #include <QtCharts/QLineSeries>
+#include <QtCharts/QPieSeries>
 #include <QtCharts/QValueAxis>
 
 #include <QDateTime>
@@ -11,6 +12,7 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QPushButton>
 #include <QVBoxLayout>
 
@@ -174,6 +176,21 @@ DashboardView::DashboardView(QWidget* parent)
     worstCellsList->setSelectionBehavior(QAbstractItemView::SelectRows);
     worstCellsList->setEditTriggers(QAbstractItemView::NoEditTriggers);
 
+    // Operator share pie: caption (Name = its text, slice count readable),
+    // chart, and a one-column list whose items mirror every slice - the
+    // E2E stack reads the caption + list, never the chart internals.
+    operatorShareCaption = new QLabel(this);
+    operatorShareCaption->setObjectName(QStringLiteral("operatorShareCaption"));
+    auto* pieChart = new QChart;
+    pieChart->setTitle(tr("Cells by operator"));
+    operatorShareChart = new QChartView(pieChart, this);
+    makeStable(operatorShareChart, "operatorShareChart");
+    operatorShareChart->setRenderHint(QPainter::Antialiasing);
+    operatorShareList = qobject_cast<QListWidget*>(
+        makeStable(new QListWidget(this), "operatorShareList"));
+    operatorShareList->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    operatorShareList->setSelectionMode(QAbstractItemView::NoSelection);
+
     // Plain caption above the weakest-cells table (Name = its text, no
     // accessibleName override) carrying the row count for the E2E stack -
     // counting UIA DataItems fails on virtualized tables (repo quirk).
@@ -188,6 +205,11 @@ DashboardView::DashboardView(QWidget* parent)
     layout->addWidget(trendChart, 1);
     layout->addWidget(worstCaption);
     layout->addWidget(worstCellsList, 1);
+    layout->addWidget(operatorShareCaption);
+    auto* shareRow = new QHBoxLayout;
+    shareRow->addWidget(operatorShareChart, 2);
+    shareRow->addWidget(operatorShareList, 1);
+    layout->addLayout(shareRow, 1);
 
     refresh();
 }
@@ -305,4 +327,33 @@ void DashboardView::refresh()
         for (int c = 0; c < row.size() && c < worstCellsList->columnCount(); ++c)
             worstCellsList->setItem(r, c, new QTableWidgetItem(row.at(c)));
     }
+
+    // Operator share pie: slice per countBy label; labels visible with an
+    // explicit black brush (the theme picks near-white on colored slices).
+    // The list mirrors the slices in the pinned format.
+    const auto share =
+        Db::countBy(QStringLiteral("operator"), province, city, technology, operatorName,
+                    from, to);
+    double shareTotal = 0;
+    for (const auto& slice : share)
+        shareTotal += slice.second;
+    operatorShareCaption->setText(
+        tr("Cells by operator - %1 slices").arg(share.size()));
+    operatorShareList->clear();
+    auto* pie = new QPieSeries;
+    for (const auto& slice : share) {
+        const double pct = shareTotal > 0 ? 100.0 * slice.second / shareTotal : 0.0;
+        operatorShareList->addItem(QStringLiteral("%1: %2 cells (%3%)")
+                                       .arg(slice.first,
+                                            QString::number(slice.second),
+                                            QString::number(pct, 'f', 1)));
+        auto* pieSlice = pie->append(slice.first, slice.second);
+        pieSlice->setLabel(
+            QStringLiteral("%1 %2%").arg(slice.first, QString::number(pct, 'f', 1)));
+        pieSlice->setLabelVisible(true);
+        pieSlice->setLabelBrush(Qt::black);
+    }
+    auto* pieChartPtr = operatorShareChart->chart();
+    pieChartPtr->removeAllSeries();
+    pieChartPtr->addSeries(pie);
 }
