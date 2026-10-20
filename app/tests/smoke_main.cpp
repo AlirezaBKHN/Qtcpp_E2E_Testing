@@ -9,6 +9,7 @@
 #include <QTableWidget>
 #include <QtCharts/QAbstractBarSeries>
 #include <QtCharts/QBarCategoryAxis>
+#include <QtCharts/QBarSeries>
 #include <QtCharts/QBarSet>
 #include <QtCharts/QChartView>
 #include <QtCharts/QDateTimeAxis>
@@ -602,6 +603,62 @@ void SmokeMain::dashboardContract()
             QVERIFY(pie->slices().at(i)->isLabelVisible());
             QCOMPARE(pie->slices().at(i)->labelBrush().color(), Qt::black);
         }
+    }
+
+    // -- Technology bar chart (spec 2026-10-20): the network chart's pinned
+    // contract (persistent axes, categories before attach, @value labels,
+    // black brush) over avgBy("technology") mapped through qualityFrom.
+    {
+        auto* techCaption =
+            admin.findChild<QLabel*>(QString::fromLatin1("techQualityCaption"));
+        auto* techList =
+            admin.findChild<QListWidget*>(QString::fromLatin1("techQualityList"));
+        auto* techChartView =
+            admin.findChild<QChartView*>(QString::fromLatin1("techQualityChart"));
+        QVERIFY2(techCaption && techList && techChartView,
+                 "tech quality widgets missing");
+
+        const auto techs =
+            Db::avgBy("technology", QString(), QString(), QString(), QString());
+        QCOMPARE(techCaption->text(),
+                 QStringLiteral("Avg quality by technology - %1 groups").arg(techs.size()));
+        QCOMPARE(techList->count(), techs.size());
+        static const QRegularExpression techRe(
+            QStringLiteral("^(.+): (\\d+\\.\\d)%$"));
+        for (int i = 0; i < techs.size(); ++i) {
+            const auto match = techRe.match(techList->item(i)->text());
+            QVERIFY(match.hasMatch());
+            QCOMPARE(match.captured(1), techs.at(i).first);
+            QCOMPARE(match.captured(2),
+                     QString::number(Db::qualityFrom(techs.at(i).second), 'f', 1));
+        }
+
+        auto* chart = techChartView->chart();
+        QCOMPARE(chart->series().size(), 1);
+        QCOMPARE(chart->axes(Qt::Horizontal).size(), 1);
+        QCOMPARE(chart->axes(Qt::Vertical).size(), 1);
+        auto* series = qobject_cast<QBarSeries*>(chart->series().first());
+        QVERIFY(series != nullptr);
+        QCOMPARE(series->count(), 1);
+        auto* set = series->barSets().first();
+        QCOMPARE(set->count(), techs.size());
+        for (int i = 0; i < techs.size(); ++i)
+            QCOMPARE(set->at(i), Db::qualityFrom(techs.at(i).second));
+        auto* axisX = qobject_cast<QBarCategoryAxis*>(chart->axes(Qt::Horizontal).first());
+        QVERIFY(axisX != nullptr);
+        QStringList cats;
+        for (const auto& t : techs)
+            cats << t.first;
+        QCOMPARE(axisX->categories(), cats);
+        auto* axisY = qobject_cast<QValueAxis*>(chart->axes(Qt::Vertical).first());
+        QVERIFY(axisY != nullptr);
+        QCOMPARE(axisY->min(), 0.0);
+        QCOMPARE(axisY->max(), 100.0);
+        QCOMPARE(axisY->tickCount(), 5);
+        QVERIFY(series->isLabelsVisible());
+        QCOMPARE(series->labelsFormat(), QStringLiteral("@value"));
+        QCOMPARE(series->labelsPrecision(), 3);
+        QCOMPARE(set->labelBrush().color(), Qt::black);
     }
 
     // -- Filter section (spec 2026-10-20): same combo populations as the

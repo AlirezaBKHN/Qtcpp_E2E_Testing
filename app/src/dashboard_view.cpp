@@ -1,5 +1,8 @@
 #include "dashboard_view.h"
 
+#include <QtCharts/QBarCategoryAxis>
+#include <QtCharts/QBarSeries>
+#include <QtCharts/QBarSet>
 #include <QtCharts/QChart>
 #include <QtCharts/QDateTimeAxis>
 #include <QtCharts/QLineSeries>
@@ -191,6 +194,34 @@ DashboardView::DashboardView(QWidget* parent)
     operatorShareList->setEditTriggers(QAbstractItemView::NoEditTriggers);
     operatorShareList->setSelectionMode(QAbstractItemView::NoSelection);
 
+    // Avg-quality-by-technology bar chart: persistent axes created exactly
+    // once (network-chart contract); refresh replaces only series and
+    // categories, categories BEFORE the attach.
+    auto* techChart = new QChart;
+    techChart->setTitle(tr("Avg quality by technology"));
+    techChart->legend()->setAlignment(Qt::AlignRight);
+    techChart->legend()->show();
+    techQualityChart = new QChartView(techChart, this);
+    makeStable(techQualityChart, "techQualityChart");
+    techQualityChart->setRenderHint(QPainter::Antialiasing);
+    techAxisX = new QBarCategoryAxis;
+    QFont axisFont(QStringLiteral("Segoe UI"), 9);
+    techAxisX->setLabelsFont(axisFont);
+    techAxisY = new QValueAxis;
+    techAxisY->setRange(0, 100);
+    techAxisY->setTitleText(QStringLiteral("Quality (%)"));
+    techAxisY->setLabelFormat(QStringLiteral("%d"));
+    techAxisY->setLabelsFont(axisFont);
+    techAxisY->setTickCount(5);
+    techChart->addAxis(techAxisX, Qt::AlignBottom);
+    techChart->addAxis(techAxisY, Qt::AlignLeft);
+    techQualityCaption = new QLabel(this);
+    techQualityCaption->setObjectName(QStringLiteral("techQualityCaption"));
+    techQualityList = qobject_cast<QListWidget*>(
+        makeStable(new QListWidget(this), "techQualityList"));
+    techQualityList->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    techQualityList->setSelectionMode(QAbstractItemView::NoSelection);
+
     // Plain caption above the weakest-cells table (Name = its text, no
     // accessibleName override) carrying the row count for the E2E stack -
     // counting UIA DataItems fails on virtualized tables (repo quirk).
@@ -210,6 +241,11 @@ DashboardView::DashboardView(QWidget* parent)
     shareRow->addWidget(operatorShareChart, 2);
     shareRow->addWidget(operatorShareList, 1);
     layout->addLayout(shareRow, 1);
+    layout->addWidget(techQualityCaption);
+    auto* techRow = new QHBoxLayout;
+    techRow->addWidget(techQualityChart, 2);
+    techRow->addWidget(techQualityList, 1);
+    layout->addLayout(techRow, 1);
 
     refresh();
 }
@@ -356,4 +392,38 @@ void DashboardView::refresh()
     auto* pieChartPtr = operatorShareChart->chart();
     pieChartPtr->removeAllSeries();
     pieChartPtr->addSeries(pie);
+
+    // Avg quality by technology: bars encode the shared 0..100 quality
+    // metric (never raw dBm), labels @value/precision 3 with an explicit
+    // black brush; categories set BEFORE the series attaches.
+    const auto techAvgs =
+        Db::avgBy(QStringLiteral("technology"), province, city, technology, operatorName,
+                  from, to);
+    techQualityCaption->setText(
+        tr("Avg quality by technology - %1 groups").arg(techAvgs.size()));
+    techQualityList->clear();
+    auto* techSeries = new QBarSeries;
+    techSeries->setLabelsVisible(true);
+    techSeries->setLabelsPosition(QAbstractBarSeries::LabelsOutsideEnd);
+    techSeries->setLabelsFormat(QStringLiteral("@value"));
+    techSeries->setLabelsPrecision(3);
+    auto* barSet = new QBarSet(tr("Quality (%)"));
+    barSet->setLabelBrush(Qt::black);
+    QStringList categories;
+    for (const auto& group : techAvgs) {
+        categories << group.first;
+        *barSet << Db::qualityFrom(group.second);
+        techQualityList->addItem(QStringLiteral("%1: %2%")
+                                     .arg(group.first,
+                                          QString::number(Db::qualityFrom(group.second),
+                                                          'f', 1)));
+    }
+    techAxisX->clear();
+    techAxisX->append(categories);
+    techSeries->append(barSet);
+    auto* techChartPtr = techQualityChart->chart();
+    techChartPtr->removeAllSeries();
+    techChartPtr->addSeries(techSeries);
+    techSeries->attachAxis(techAxisX);
+    techSeries->attachAxis(techAxisY);
 }

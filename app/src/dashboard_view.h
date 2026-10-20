@@ -8,6 +8,7 @@
 
 class QDateTimeAxis;
 class QValueAxis;
+class QBarCategoryAxis;
 class QLabel;
 class QLineEdit;
 class QListWidget;
@@ -75,4 +76,13 @@ private:
     QLabel* operatorShareCaption = nullptr;
     QChartView* operatorShareChart = nullptr;
     QListWidget* operatorShareList = nullptr;
+
+    // Avg-quality-by-technology bar chart (the network chart's pinned
+    // contract: persistent axes, categories before attach, @value labels,
+    // black brush) + its readable caption/list pair.
+    QLabel* techQualityCaption = nullptr;
+    QChartView* techQualityChart = nullptr;
+    QListWidget* techQualityList = nullptr;
+    QBarCategoryAxis* techAxisX = nullptr;
+    QValueAxis* techAxisY = nullptr;
 };
