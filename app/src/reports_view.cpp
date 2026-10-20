@@ -169,6 +169,12 @@ ReportsView::ReportsView(QWidget* parent)
     layout->addWidget(filterSection);
     layout->addLayout(headerRow);
     layout->addWidget(reportTable, 1);
+    // The caption rides its own layout slot directly above the pie row -
+    // never a floating child at (0,0) (review bug: it painted over the
+    // province combo). 150px minimum height: the same Qt Charts pane
+    // minimum that zeroed the dashboard pie's plot area.
+    layout->addWidget(groupShareCaption);
+    groupShareChart->setMinimumHeight(150);
     auto* shareRow = new QHBoxLayout;
     shareRow->addWidget(groupShareChart, 2);
     shareRow->addWidget(groupShareList, 1);

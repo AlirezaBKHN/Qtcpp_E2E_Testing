@@ -603,6 +603,13 @@ void SmokeMain::dashboardContract()
             QVERIFY(pie->slices().at(i)->isLabelVisible());
             QCOMPARE(pie->slices().at(i)->labelBrush().color(), Qt::black);
         }
+        // The pie must RENDER, not just show its legend: a pane below Qt
+        // Charts' height minimum yields an EMPTY plot area (review bug:
+        // probed plotArea 0x0 while the series was healthy - only the
+        // legend, which lives outside the plot area, was visible).
+        QVERIFY(shareChart->height() >= 150);
+        QVERIFY2(!shareChart->chart()->plotArea().isEmpty(),
+                 "operator pie has no plot area (legend-only chart)");
     }
 
     // -- Technology bar chart (spec 2026-10-20): the network chart's pinned
@@ -912,6 +919,13 @@ void SmokeMain::reportsContract()
             QVERIFY(pie->slices().at(i)->isLabelVisible());
             QCOMPARE(pie->slices().at(i)->labelBrush().color(), Qt::black);
         }
+        // The pie must RENDER (same empty-plotArea trap as the dashboard).
+        QVERIFY(shareChart->height() >= 150);
+        QVERIFY2(!shareChart->chart()->plotArea().isEmpty(),
+                 "group pie has no plot area (legend-only chart)");
+        // The caption must sit BELOW the summary table - never painted
+        // over the filter combos (review bug: it was not in the layout).
+        QVERIFY(shareCaption->y() >= table->y() + table->height());
 
         // Search narrows summary + pie to the filtered aggregates.
         province->setCurrentText(QStringLiteral("Tehran"));

@@ -236,16 +236,29 @@ DashboardView::DashboardView(QWidget* parent)
     layout->addWidget(trendChart, 1);
     layout->addWidget(worstCaption);
     layout->addWidget(worstCellsList, 1);
-    layout->addWidget(operatorShareCaption);
+    // The two share charts share ONE row: stacked separately, each pane
+    // fell below Qt Charts' pane-height minimum (title + legend + minimal
+    // pie) and the chart yielded a ZERO plot area - only the legend
+    // rendered (review bug, probed plotArea 0x0 with a healthy series).
+    // The 150px minimum height is the guard for the same trap.
+    operatorShareChart->setMinimumHeight(150);
+    techQualityChart->setMinimumHeight(150);
     auto* shareRow = new QHBoxLayout;
-    shareRow->addWidget(operatorShareChart, 2);
-    shareRow->addWidget(operatorShareList, 1);
-    layout->addLayout(shareRow, 1);
-    layout->addWidget(techQualityCaption);
-    auto* techRow = new QHBoxLayout;
-    techRow->addWidget(techQualityChart, 2);
-    techRow->addWidget(techQualityList, 1);
-    layout->addLayout(techRow, 1);
+    auto* pieBlock = new QVBoxLayout;
+    pieBlock->addWidget(operatorShareCaption);
+    auto* pieInner = new QHBoxLayout;
+    pieInner->addWidget(operatorShareChart, 2);
+    pieInner->addWidget(operatorShareList, 1);
+    pieBlock->addLayout(pieInner);
+    shareRow->addLayout(pieBlock, 1);
+    auto* techBlock = new QVBoxLayout;
+    techBlock->addWidget(techQualityCaption);
+    auto* techInner = new QHBoxLayout;
+    techInner->addWidget(techQualityChart, 2);
+    techInner->addWidget(techQualityList, 1);
+    techBlock->addLayout(techInner);
+    shareRow->addLayout(techBlock, 1);
+    layout->addLayout(shareRow, 2);
 
     refresh();
 }
