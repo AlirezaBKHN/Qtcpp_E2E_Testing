@@ -1,7 +1,10 @@
 """Reports tab DSL: group summary + drill-down + report export."""
 from __future__ import annotations
 
+import time
+
 import config as C
+from drivers import keyboard
 from dsl.export_result import ExportResult
 from pageobjects.resolve_element import find
 from pageobjects.reports_view import ReportsView
@@ -22,11 +25,21 @@ class ReportsDsl:
 
     # -- actions -------------------------------------------------------
     def group_by(self, value: str) -> "ReportsDsl":
-        """Select the group column via keyboard type-ahead (WAD quirk)."""
+        """Select the group column via popup keyboard type-ahead.
+
+        The old closed-combo send_keys path is dead in attached sessions
+        (MainPage.select_combo probe ruling); the popup mechanics are the
+        only live-proven combo selection path.
+        """
         if value not in GROUP_COLUMNS:
             raise KeyError(
                 f"unknown report group {value!r}; known: {sorted(GROUP_COLUMNS)}")
-        self._el("reportGroupBy").send_keys(value)
+        el = self._el("reportGroupBy")
+        el.click()              # popup opens and takes keyboard focus
+        time.sleep(0.5)         # popup draw settle
+        keyboard.type_text(value)
+        keyboard.press_enter()  # commits the type-ahead item, popup closes
+        time.sleep(0.6)         # summary refresh settle
         return self
 
     def select_row(self, row: int) -> "ReportsDsl":
@@ -88,6 +101,10 @@ class ReportsDsl:
         """Raw item texts of the groupShareList readout."""
         return self._reports.list_items(control)
 
+    def drill_chart_visible(self) -> bool:
+        """The drill-down trend chart is displayed after selecting a row."""
+        return self._reports.drill_chart_visible()
+
     # -- readers (the TEST asserts) ------------------------------------
     def summary_rows(self) -> int:
         """Number of data rows in the summary table."""
@@ -119,3 +136,12 @@ class ReportsExportResult(ExportResult):
             f"no new report_*.csv appeared in {self._dir}; "
             f"files before: {sorted(self._before)}")
         return self
+
+    def newest_file(self) -> Path | None:
+        # Base glob is export_*.csv; reports watch report_*.csv (probed by
+        # TC024: should_create_file passed while newest_file returned None).
+        new_files = self._current() - self._before
+        if not new_files:
+            return None
+        files = [p for p in self._dir.glob("report_*.csv") if p.name in new_files]
+        return max(files, key=lambda p: p.stat().st_mtime) if files else None

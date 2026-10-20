@@ -1,4 +1,13 @@
-"""Reports summary-table page object (small table; all rows realized)."""
+"""Reports summary-table page object (partially virtualized).
+
+Spec 2026-10-20 follow-up: the group-share pie + drill chart share the
+tab height with the table, so at FULL province count only the visible
+rows are realized (~5-6 DataItems) - row_count() is only trustworthy for
+small FILTERED tables (TC023/TC024 use filtered 1-4-row summaries). The
+unfiltered row count rides the pinned groupShare caption instead
+(TC025); realized-row counting beyond '> 0' is NOT valid E2E (repo
+quirk).
+"""
 from __future__ import annotations
 
 from math import ceil

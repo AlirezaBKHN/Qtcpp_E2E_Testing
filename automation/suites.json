@@ -22,7 +22,15 @@
   "reporting": [
     "test_tc009_export_csv",
     "test_tc010_chart_visibility",
-    "test_tc014_dashboard"
+    "test_tc014_dashboard",
+    "test_tc023_reports_filters_pie",
+    "test_tc024_reports_drill_filtered",
+    "test_tc025_cross_tab_isolation"
+  ],
+  "dashboard": [
+    "test_tc020_dashboard_filters",
+    "test_tc021_dashboard_pie_vs_csv",
+    "test_tc022_dashboard_tech_bar"
   ],
   "data": [
     "test_tc008_refresh",
