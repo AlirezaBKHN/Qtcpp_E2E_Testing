@@ -62,6 +62,35 @@
 \label{fig:arch}
 \end{figure}
 
+برای اینکه خواننده بتواند در ادامه‌ی فصل مسیر هر جزء را دنبال کند، ساختار پوشه‌ی چارچوب چنین است (فایل‌های تکرارشونده خلاصه شده‌اند):
+
+\begin{latin}
+\begin{lstlisting}[numbers=none, basicstyle=\ttfamily\scriptsize]
+automation/
+|-- config.py          # URLs, paths, seeded credentials
+|-- conftest.py        # pytest fixtures: signed/admin/tracker + isolate_db
+|-- fixtures.py        # DB restore + migrate engine (per-test isolation)
+|-- locators.py        # stable-id locator candidates + readout ids
+|-- suites.json        # suite name -> test files
+|-- dsl/               # tracker.py (entry), network.py, dashboard.py,
+|                      # reports.py, users.py, export_result.py
+|-- drivers/           # factory.py (sessions), foreground.py, keyboard.py
+|-- pageobjects/       # main_page.py, dashboard_view.py, reports_view.py,
+|                      # resolve_element.py, filter_section.py, date_edit.py,
+|                      # readout_list.py, tables, charts, signin, tabs
+|-- tests/             # test_tc001..test_tc025 (25 scenarios) + fixtures unit
+\-- tools/             # inspect_ui.py, probe_*.py, record_suite_video.py
+\end{lstlisting}
+\end{latin}
+
+دو مسیر خارج از این پوشه نیز در ادامه‌ی فصل نقش دارند:
+\lr{database/fixtures}
+(فایل‌های پایگاه‌داده‌ی متعهدشده) و
+\lr{database/fixtures.json}
+(نگاشت تست به فیکسچر) که در بخش جداسازی پایگاه‌داده می‌آیند، و اسکریپت‌های
+\lr{scripts/}
+(ساخت برنامه، برپایی سرور درایور و اجرای سوییت‌ها) که در بخش پایپلاین به آن‌ها اشاره می‌شود.
+
 \section{قراردادهای پایداری در برنامه}
 شکننده‌ترین بخش تست‌های رابط کاربری، مکان‌یابی است. چارچوب دو قرارداد در سطح برنامه‌ی نمونه تعریف می‌کند که برنامه‌های هدف باید رعایت کنند:
 \begin{enumerate}
