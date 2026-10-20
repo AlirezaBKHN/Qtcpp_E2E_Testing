@@ -1,0 +1,278 @@
+\usepackage[dvipsnames,table,svgnames]{xcolor}
+\usepackage[top=3cm,bottom=3cm,left=2.5cm,right=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{pifont}
+\usepackage[Lenny]{fncychap}
+\usepackage{amsmath,amsthm,amssymb}
+\usepackage{float}
+\usepackage{xparse}
+\usepackage{listings}
+\usepackage{pifont}
+\usepackage[framemethod=TikZ]{mdframed}
+\usepackage{fontspec}
+\setmainfont[Scale=1.2]{Linux Libertine O}
+
+\usepackage{hyperref}
+\usepackage[xindy,acronym]{glossaries}
+
+
+
+%% ===========================================================================
+%تنظیمات hyperref
+\hypersetup{
+	pdfmenubar=false,			% show or hide Acrobat’s menu
+	pdftoolbar=true,			%show or hide Acrobat’s toolbar
+	pdfstartview=FitH, 
+	%hyperfigures=true,
+	colorlinks=true, 
+	linkcolor=blue, 
+	anchorcolor=green, 
+	citecolor=magenta, 
+	urlcolor=cyan, 
+	filecolor=magenta, 
+	bookmarkstype=toc,
+	unicode = true			%allows to use characters of non-Latin based languages in Acrobat’s bookmarks
+	%bookmarksopen = true,
+	%bookmarksopenlevel = 1
+	%bookmarksnumbered = true,
+	%hidelinks			%hide links (removing color and border)
+} % M
+
+%% ===============================================================================
+%تنظیم فاصله بین خطوط
+\newcommand{\BaseLineSpreadForList}{1.1}
+\newcommand{\BaseLineSpreadFA}{1.7}
+\linespread{\BaseLineSpreadFA}
+
+
+%% ==================================================================================
+% این دستور تعیین می‌کند که چه تا چه عمقی شماره‌گذاری شود. در خود متن نه در فهرست مطالب دقت کنید که برای تعیین این که در فهرست مطالب تا چه عمقی شماره گذاری صورت بگیرد باید از دستور
+% \setcounter{tocdepth}{....}
+% استفاده کرد که در ادامه می آید. 
+\makeatletter
+\setcounter{tocdepth}{2}
+\makeatother
+%  تنظیمات مربوط به فهرست مطالب، بازنویسی محیط فهرست مطالب برای تعیین فاصله خطوط، قرار دادن در bookmark ها
+\let\Oldtableofcontents\tableofcontents
+\renewcommand{\tableofcontents}{
+	\Oldtableofcontents\clearpage
+}%
+
+
+%% ============================================================================
+% تنظمیات محیط فهرست اشکال
+
+% این دستورات موجب می‌شود که یک تصویر بند انگشتی در فهرست مطالب ظاهر شود. برای این کار می‌بایست در قسمت caption به صورت زیر فایل تصویر نیز وارد شود. 
+% ٍExample: \caption{\lofimage{/Introduction/Person/Shannon} \lr{Claude Shannon}}
+
+\newlength{\lofthumbsize}
+\setlength{\lofthumbsize}{2em}
+
+\newif\iflofimage
+\DeclareRobustCommand*{\lofimage}[2][]{%
+  \iflofimage
+    $\vcenter to \lofthumbsize{\vss%
+      \hbox to \lofthumbsize{\hss\includegraphics[{width=\lofthumbsize,height=\lofthumbsize,keepaspectratio=true,#1}]{#2}\hss}%
+    \vss}$%
+    \quad
+  \fi
+  \ignorespaces
+}
+%% در دستورات زیر محیط فهرست اشکال باز تعریف شده و اولا این محیط به bookmark اضافه شده و ثانیا مشکل صفحات اضافی حل شده است. ثالثا فاصله خطوط برای زیبایی در این 
+%% محیط اندکی کم شده است، ولی دوباره بعد از آوردن این محیط به حالت اولیه برگشته است. در ضمن از شماره گذاری حرفی برای این محیط استفاده شده است. 
+\makeatletter
+\let\Oldlistoffigures\listoffigures
+\renewcommand{\listoffigures}{
+	\cleardoublepage
+	\phantomsection
+	\lofimagetrue
+	\Oldlistoffigures\clearpage
+	\lofimagefalse
+}%
+\makeatother
+
+%% ===============================================================================
+% در دستورات زیر محیط فهرست جداول باز تعریف شده و اولا این محیط به bookmark اضافه شده و ثانیا مشکل صفحات اضافی حل شده است. ثالثا فاصله خطوط برای زیبایی در این 
+% محیط اندکی کم شده است، ولی دوباره بعد از آوردن این محیط به حالت اولیه برگشته است. در ضمن از شماره گذاری حرفی برای این محیط استفاده شده است. 
+\makeatletter
+\let\Oldlistoftables\listoftables
+\renewcommand{\listoftables}{
+	\cleardoublepage
+	\phantomsection
+	\Oldlistoftables\clearpage
+}%
+\makeatother
+
+%% ==============================================================================
+%تنظیمات مربوط به مراجع
+\makeatletter
+\let\Oldbibliography\bibliography
+\RenewDocumentCommand{\bibliography}{g g}{
+	\let\appendix\relax
+% تنظیم کننده فاصله بین خطوط در این قسمت
+	\linespread{\BaseLineSpreadForList}
+% با این دستور عنوان این قسمت به (مراجع) تغییر پیدا می‌کند. 
+	\renewcommand{\bibname}{Bibliography}
+	\clearpage
+	\phantomsection
+	\addcontentsline{toc}{chapter}{Bibliography}
+	\IfValueTF{#2}{
+			\bibliographystyle{#2}
+			\Oldbibliography{#1}
+	}{%%
+			\bibliographystyle{ieeetr}
+			\Oldbibliography{#1}
+	}%%
+	\linespread{\BaseLineSpreadFA}
+}%
+\makeatother
+
+%% =================================================================================
+\makeglossaries
+\glsdisablehyper
+
+% دستور برای قرار دادن فهرست اختصارات
+
+\newglossarystyle{myAbbrlist}{%
+	% این دستور در حقیقت عملیات گروه‌بندی را انجام می‌دهد. بدین صورت که اختصارات‌ در بخش‌های جداگانه گروه‌بندی می‌شوند، 
+	% عنوان بخش همان نام حرفی است که هر اختصار در آن گروه با آن شروع شده است. 
+	\renewenvironment{theglossary}{}{}
+	\renewcommand*{\glsgroupskip}{\vskip 10mm}
+	\renewcommand*{\glsgroupheading}[1]{\subsection*{\glsgetgrouptitle{##1}}}
+	% در این دستور نحوه نمایش اختصارات می‌آید. در این جا حالت کوچک اختصار در سمت چپ و حالت بزرگ در سمت راست قرار داده شده است، و بین آن با نقطه پر می‌شود. 
+	\renewcommand*{\glossentry}[2]{\noindent\glsentrytext{##1}\dotfill\space \Glsentrylong{##1}\\}
+		% تغییر نام محیط abbreviation به فهرست اختصارات
+	\renewcommand*{\acronymname}{Abbreviations}
+}
+
+\makeatletter
+\let\Oldprintglossary\printglossary
+\newcommand{\printabbreviation}{
+	\cleardoublepage
+	\phantomsection
+	\linespread{\BaseLineSpreadForList}
+% با این دستور عنوان فهرست اختصارات به فهرست مطالب اضافه می‌شود. 
+	\setglossarystyle{myAbbrlist}
+	
+	\Oldprintglossary[type=acronym]
+	\clearpage
+	\linespread{\BaseLineSpreadFA}
+}%
+\makeatother
+\newcommand{\printacronyms}{\printabbreviation}
+
+
+\makeatletter
+\setglossarystyle{long}
+\newacronymstyle{ex-footnote}%
+{%
+  \GlsUseAcrEntryDispStyle{footnote}%
+}%
+{%
+  \GlsUseAcrStyleDefs{footnote}%
+  \renewcommand*{\genacrfullformat}[2]{%
+   \firstacronymfont{\glsentryshort{##1}}##2%
+   \expandafter\footnote\expandafter{\expandafter\glsentrylong\expandafter{##1}}%
+  }%
+  \renewcommand*{\Genacrfullformat}[2]{%
+   \firstacronymfont{\Glsentryshort{##1}}##2%
+   \expandafter\footnote\expandafter{\expandafter\glsentrylong\expandafter{##1}}%
+  }%
+  \renewcommand*{\genplacrfullformat}[2]{%
+   \firstacronymfont{\glsentryshortpl{##1}}##2%
+   \expandafter\footnote\expandafter{\expandafter\glsentrylongpl\expandafter{##1}}%
+  }%
+  \renewcommand*{\Genplacrfullformat}[2]{%
+   \firstacronymfont{\Glsentryshortpl{##1}}##2%
+   \expandafter\footnote\expandafter{\expandafter\glsentrylongpl\expandafter{##1}}%
+  }%
+}
+\setacronymstyle{ex-footnote}
+
+\makeatletter
+
+%% ================================================================================
+
+
+\makeatletter
+
+%%% تعریف یکسری متغیرها که کاربر می‌تواند بعدا آن ها را مقداردهی کند. 
+
+\gdef\@type{}
+\def\type#1{\gdef\@type{#1}}
+
+%% عنوان محصول را تعیین می‌کند. این عنواند در ایجاد عنوان در مستند استفاده
+%% می‌شود این عنوان در هر مستند باید ایجاد شود در غیر این صورت از عنوان
+%% پیشفرض استفاده خواهد شد.
+\gdef\@title{}
+\def\title#1{\gdef\@title{#1}}
+
+%% زیر عنوان یک متن ساده را تعیین می‌کند که یک هدف مهم محصول را تعیین می‌کند
+%% این عنوان می تواند برای یک محصول در نظر گرفته نشود. از این داده برای 
+%% ایجاد عنوان و سایر مکان های محصول استفاده می‌شود.
+\gdef\@subtitle{}
+\def\subtitle#1{\gdef\@subtitle{#1}}
+%% افراد و گروه های که در تهیه این مستند و محصول همکاری داشته اند را تعیین
+%% می کند این داده همواره باید بیان شود. این داده در نوشتن عنوان و دیگر قسمت
+%% های مستند مورد استفاده قرار می‌گیرد.
+\gdef\@author{}
+\def\author#1{\gdef\@author{#1}}
+\newcommand{\authorText}{\@author\,}
+%% تاریخ نهایی نوشتن مستند را تعیین می‌کند این تاریخ در نوشتن عنوان استفاده
+%% می‌شود این تارخ باید تعیین شود در غیر این صورت به صورت پیش فرض یک تاریخ
+%% برای آن استفاده می شود.
+\gdef\@date{\today}
+\def\date#1{\gdef\@date{#1}}
+
+\gdef\@supervisor{} 
+\def\supervisor#1{\gdef\@supervisor{#1}}
+
+\gdef\@adviser{}
+\def\adviser#1{\gdef\@adviser{#1}}
+
+\gdef\@session{}
+\def\session#1{\gdef\@session{#1}}
+
+\gdef\@institute{}
+\def\institute#1{\gdef\@institute{#1}}
+
+\gdef\@faculity{}
+\def\faculity#1{\gdef\@faculity{#1}}
+
+\gdef\@group{}
+\def\group#1{\gdef\@group{#1}}
+
+\gdef\@community{}
+\def\community#1{\gdef\@community{#1}}
+
+\gdef\@forwhat{}
+\def\forwhat#1{\gdef\@forwhat{#1}}
+
+\gdef\@field{}
+\def\field#1{\gdef\@field{#1}}
+
+
+\gdef\@version{}
+\def\version#1{\gdef\@version{#1}}
+
+%%% نام فایلی لوگوی مورد استفاده در نوشتار توسط این پارامتر مشخص می‌شود. 
+\gdef\@logofile{logonotfound}
+\def\logofile#1{\gdef\@logofile{#1}}
+%%% اندازه فایل لوگوی موجود در متن توسط این پارامتر مشخص می‌شود.
+\gdef\@logoScale{.3\textwidth}
+\def\logoScale#1{\gdef\@logoScale{#1}}
+
+\makeatother
+
+%% ================================================================================
+% Define the theorem and lemma environments
+\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+
+
+
+
+
+
+

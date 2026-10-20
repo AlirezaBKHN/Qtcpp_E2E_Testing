@@ -1,0 +1,86 @@
+\documentclass[twoside]{report}
+
+\newcommand{\RootPath}{./}
+\newcommand{\MyPath}{\RootPath Boostan/tex/}
+
+\usepackage{adjustbox}
+\usepackage{ptext}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{listings}
+\usepackage{media9}
+\usepackage{tabularx}
+\usepackage{float}
+
+% قالب بستان؛ بارگذاری بسته‌ها و تنظیمات آن (شامل xcolor با گزینه‌هایش)
+\input{\MyPath Boostan-Thesis}
+
+% رنگ و تنظیمات کد پس از بارگذاری قالب
+\definecolor{codeColor}{rgb}{0.95,0.95,0.95}
+% فونت فارسی بدنه گلوله‌ی فهرست‌ها را ندارد — گلوله از فونت لاتین
+\renewcommand{\labelitemi}{\lr{\textbullet}}
+\lstset{
+	backgroundcolor=\color{codeColor},
+	basicstyle=\ttfamily\footnotesize,
+	keywordstyle=\color{blue},
+	commentstyle=\color{gray},
+	stringstyle=\color{brown},
+	showstringspaces=false,
+	numbers=left,
+	numberstyle=\tiny\color{gray},
+	breaklines=true,
+	frame=single,
+	rulecolor=\color{black},
+}
+
+%واژه‌های خود را در فایل words وارد کنید، و در ضمن اختصارات را نیز در abbre وارد کنید.
+\input{./ETC/words}
+\input{./ETC/abbre}
+
+\title{طراحی و پیاده‌سازی چارچوب تست \lr{E2E} برای نرم‌افزارهای مبتنی بر \lr{Qt C++}}
+\faculity{دانشکده مهندسی کامپیوتر}
+\group{نام گروه}
+\author{علیرضا بیات خانی}
+\authorCode{99521136}
+\forwhat{پایان‌نامه کارشناسی}
+\field{در رشته‌ مهندسی کامپیوتر}
+\logofile{Logo/Fa}
+\logoScale{0.25\linewidth}
+\supervisor{دکتر ابوالفضل دیانت}
+\date{پاییز 1405}
+
+\graphicspath{{./Pic/}}
+
+\begin{document}
+\pagenumbering{gobble}
+\thesisStyleO
+\newpage
+\Godpage
+\newpage
+\input{./ETC/sign}
+\input{./ETC/taahod}
+\input{Chapters/Abstract/Fa.tex}
+
+\clearpage
+\pagenumbering{alph}
+\tableofcontents
+\listoffigures
+%\listoftables
+\printabbreviation
+\pagenumbering{arabic}
+
+\pagestyle{mystyle}
+\input{Chapters/Introduction}
+\input{Chapters/Concepts}
+\input{Chapters/RelatedWorks}
+\input{Chapters/DemoApp}
+\input{Chapters/Framework}
+\input{Chapters/Evaluation}
+\input{Chapters/Conclusion}
+
+\bibliography{./ETC/myref}
+\printglossary
+
+\input{Chapters/Abstract/En.tex}
+\input{Chapters/Titles/English.tex}
+\end{document}

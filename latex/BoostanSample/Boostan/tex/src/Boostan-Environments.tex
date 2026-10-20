@@ -1,0 +1,1106 @@
+%% Last Update: 30 Jul 2024
+%
+
+%% ====================================================================================
+\makeatletter
+% تعریف برخی نمادهای item و شماره گذاری برای استفاده
+\newcommand{\idx}[1]{\index{#1}#1}
+% می تواند برای ارایه نکات در محیط itemize به کار رود، روند این کار به این صورت است،  (شکل یک تیر)
+\newcommand{\arcm}{\item[\Large\color{red}\ding{247}]}
+\newcommand{\arcmO}{\noindent\textcolor{red}{\Large\ding{247}}\;}
+% این شکل می‌تواند برای بیان مزایای یک قضیه بکار رود (شکل تیک)
+\newcommand{\tick}{\item[\ifthenelse{\equal{\@docStyle}{Pres}}{\LARGE}{\large}\color{green}\ding{52}]}
+\newcommand{\tickO}{\noindent\textcolor{green}{
+\ifthenelse{\equal{\@docStyle}{Pres}}{\Huge}{\Large}
+\ding{52}}\;}
+% برای  بیان معایب و یا نکات منفی (شکل یک ضربدر)
+\newcommand{\X}{\item[\ifthenelse{\equal{\@docStyle}{Pres}}{\Huge}{\Large}\color{red}\ding{56}]}
+\newcommand{\XO}{\noindent\textcolor{red}{
+\ifthenelse{\equal{\@docStyle}{Pres}}{\Huge}{\LARGE}
+\ding{56}}\;}
+% بیان موارد یک قضیه (شکل یک دست)
+\newcommand{\hand}{\item[
+\ifthenelse{\equal{\@docStyle}{Pres}}{\huge}{\Large}\color{blue}\ding{45}]}
+\newcommand{\handO}{\noindent\textcolor{blue}{
+\ifthenelse{\equal{\@docStyle}{Pres}}{\Huge}{\LARGE}
+\ding{45}}\;}
+% برای مواردی که: این موارد شامل .... می شود، توسط عناصر زیر مشخص می شود (شکل یک درخت)
+% برای نوشتن  پارامتر‌ها، 
+\newcommand{\tree}{\item[
+\ifthenelse{\equal{\@docStyle}{Pres}}{\huge}{\Large}\color{ForestGreen}\ding{171}]}
+\newcommand{\treeO}{\noindent\textcolor{ForestGreen}{
+\ifthenelse{\equal{\@docStyle}{Pres}}{\Huge}{\Large}\ding{171}}\;}
+% برای این که چند مورد را تعریف کنیم (علامت دست که دو گرفته)
+\newcommand{\two}{\item[\LARGE\color{blue}\ding{44}]}
+\newcommand{\twoO}{\noindent\textcolor{blue}{\LARGE\ding{44}}\;}
+% (شکل یک قیچی)
+\newcommand{\sci}{\item[
+\ifthenelse{\equal{\@docStyle}{Pres}}{\large}{\footnotesize}\color{OrangeRed}\ding{108}]}
+\newcommand{\sciO}{\noindent\textcolor{OrangeRed}{
+\ifthenelse{\equal{\@docStyle}{Pres}}{\large}{\footnotesize}\ding{108}}\;}
+%شکل
+\newcommand{\starE}{\item[\Large\color{Plum}\ding{97}]}
+\newcommand{\starEO}{\noindent\textcolor{Plum}{\Large\ding{97}}\;}
+% برای حالت‌هایی که فرضیات داریم. 
+\newcommand{\music}{\item[\Large\color{Green}\ding{161}]}
+\newcommand{\musicO}{\noindent\textcolor{Green}{
+\ifthenelse{\equal{\@docStyle}{Pres}}{\Huge}{\Large}\ding{161}}\;}
+
+\newcommand{\gol}{\item[\Huge\color{RubineRed}\ding{96}]}
+\newcommand{\golO}{\noindent\textcolor{RubineRed}{\Huge\ding{96}}\;}
+
+\newcommand{\questionO}{\noindent%
+\ifthenelse{\equal{\@docStyle}{Pres}}{\includegraphics[width=8mm]{problemIcon}}{\includegraphics[width=4mm]{problemIcon}}%
+}
+
+\makeatother
+
+%%% ================================================================================
+% با دستور newtheoremstyle شما می توانید یک استایل جدید برای محیط هایی چون plain، definition‌ و ... تعریف کنید. شکل کلی این دستور به صورت زیر است.
+
+%\newtheoremstyle{stylename}% name of the style to be used
+%  {spaceabove}% measure of space to leave above the theorem. E.g.: 3pt
+%  {spacebelow}% measure of space to leave below the theorem. E.g.: 3pt
+%  {bodyfont}% name of font to use in the body of the theorem
+%  {indent}% measure of space to indent
+%  {headfont}% name of head font
+%  {headpunctuation}% punctuation between head and body
+%  {headspace}% space after theorem head; " " = normal interword space
+%  {headspec}% Manually specify head
+ % تعریف محیط‌های گوناگون مانند محیط برای قضیه و ... 
+% theoremstyle = > plain, definition, remark 
+
+
+\setlength{\topsep}{0pt}
+
+% با دستور newtheorem یک نوع از استایلی که در بالای آن تعریف شده است ایجاد می کنیم.
+\makeatletter
+\theoremstyle{plain}
+%\newtheorem{theorem}{قضیه}
+\ifthenelse{\equal{\@depRe}{none}}{\newtheorem{theorem}{قضیه}}{\newtheorem{theorem}{قضیه}[\@depRe]}
+\newtheorem{principle}{اصل}
+\newtheorem{proposition}{گزاره}
+%\newtheorem{lemma}{لم}
+\ifthenelse{\equal{\@depRe}{none}}{\newtheorem{lemma}{لم}}{\newtheorem{lemma}{لم}[\@depRe]}
+
+\theoremstyle{definition}
+%\newtheorem{definition}{تعریف}
+\ifthenelse{\equal{\@depRe}{none}}{\newtheorem{definition}{تعریف}}{\newtheorem{definition}{تعریف}[\@depRe]}
+\ifthenelse{\equal{\@depRe}{none}}{\newtheorem{example}{مثال}}{\newtheorem{example}{مثال}[\@depRe]}
+\newtheorem{prob}{سوال}
+
+\theoremstyle{remark}
+%\newtheorem{corollary}{نتیجه}
+\ifthenelse{\equal{\@depRe}{none}}{\newtheorem{corollary}{نتیجه}}{\newtheorem{corollary}{نتیجه}[\@depRe]}
+\newtheorem{property}{نکته}
+\newtheorem{remark}{ملاحظه}
+\makeatother
+
+%\declaretheoremstyle[headfont=\bfseries, notefont=\bfseries , postheadspace=\newline]{mystyle}
+%\declaretheorem[style=mystyle,name=تعریف]{definition}
+%
+%\let\olddefnition\definition
+%\let\oldenddefnition\enddefinition
+%\renewenvironment{definition}{
+%\olddefnition
+%}{
+%\begin{latin}
+%\vskip -3mm
+%\ding{36} ------------------
+%\end{latin}
+%\oldenddefnition
+%}
+
+% در این جا محیط proof را باز تعریف می‌کنیم.
+\let\oldproof\proof
+\let\oldendproof\endproof
+\def\proof{\par\noindent\textcolor{red}{\textbf{اثبات.}} }
+\def\endproof{\vskip -5mm\hfill$\blacksquare$\oldendproof}
+
+% تعریف یک محیط برای  اثبات لم ها. در این محیط بر خلاف محیط proof ساده، یک مربع توخالی می‌گذارد. 
+\def\lemmaproof{\par\noindent\textcolor{ForestGreen}{\textbf{اثبات لم.}} }
+\def\endlemmaproof{\vskip -5mm\hfill$\square$\oldendproof}
+
+%%% ============================================================================================
+ % در ادامه یکسری محیط جالب به صورت کادر رنگی برای استفاده های مختلف تعریف می شود. 
+\makeatletter
+\newdimen\errorsize \errorsize=0.2pt
+% Frame with a label at top
+\newcommand{\LabFrame}[2]{
+	\linespread{1.1}
+	\fboxrule=\FrameRule
+	\fboxsep=-\errorsize
+	\textcolor{FrameColor}{
+	\fbox{
+	\vbox{\nobreak
+	\advance\FrameSep\errorsize
+	\begingroup
+	\advance\baselineskip\FrameSep
+	\hrule height \baselineskip
+	\nobreak
+	\vskip-\baselineskip
+	\endgroup
+	\vskip 0.5\FrameSep
+	\hbox{\hskip\FrameSep \strut
+	\textcolor{TitleColor}{\textbf{#1}}}
+	\nobreak \nointerlineskip
+	\vskip 1.3\FrameSep
+	\hbox{\hskip\FrameSep
+	{\normalcolor#2}
+	\hskip\FrameSep}
+	\vskip\FrameSep
+}}}}
+
+\definecolor{FrameColor}{rgb}{0.25,0.25,1.0}
+\definecolor{TitleColor}{rgb}{1.0,1.0,1.0}
+
+\newenvironment{contlabelframe}[2][\Frame@Lab\ (ادامه)]{% 
+	% Optional continuation label defaults to the first label plus
+	\def\Frame@Lab{#2}
+	\def\FrameCommand{\LabFrame{#2}}
+	\def\FirstFrameCommand{\LabFrame{#2}}
+	\def\MidFrameCommand{\LabFrame{#1}}
+	\def\LastFrameCommand{\LabFrame{#1}}
+	\MakeFramed{\advance\hsize-\width \FrameRestore} 
+}{\endMakeFramed}
+%\newcounter{theoremu}
+
+\newenvironment{colorBox}[1]{%
+	\par
+	%\refstepcounter{theoremu}
+	\begin{contlabelframe}{{#1}}
+	\noindent\ignorespaces
+}{
+	\end{contlabelframe}
+}% 
+\makeatother  
+
+%%% ============================================================================================
+%% این محیط به صورت یک کادر سایه دار با سایه سیاه رنگ 
+\newsavebox\mybox
+\newenvironment{myshadowbox}{%
+	\begin{lrbox}{\mybox}
+	\begin{minipage}{\dimexpr(\textwidth-2\fboxsep-2\fboxrule-\shadowsize)}
+	\linespread{1.5}
+}{%
+	\end{minipage}
+	\end{lrbox}
+	\vskip10pt
+	\noindent
+	\shadowbox{\usebox\mybox}
+	\vskip10pt
+}%
+
+%%% ==========================================================================
+%% این محیط برای مواقعی مفید است که می خواهیم یک تمرین و یا سوال طرح کنیم. در این حالت دستوری به نام probsec به صورت زیر تعریف شده است:
+%% \probsec{....}
+%% که قسمت نقطه چین را می توان به صورت خالی رها نمود. با نوشتن این دستور عبارت سوال به طور خودکار نوشته می شود و سپس شماره آن نیز به طور خودکار قرار داده می شود. اگر شما در نقطه چین موردی را بنویسید این مورد به صورت عنوان سوال قرار می گیرد.  یعنی مثلا در کد زیر:
+%% \probsec{شبکه}
+%% در این صورت مثلا می نویسد: سوال ۱: شبکه و خود سوال از خط بعدی شروع می شود. 
+
+%% برای شماره گذاری محیط یاد شده ابتدا یک counter‌ تعریف می کنیم. 
+\newcounter{problemcount}
+\addtocounter{problemcount}{1} % set them to some other numbers than 0
+
+\newcommand{\probsec}[1]{{\noindent\normalfont\bfseries{\textcolor{blue}{
+	سوال
+ \arabic{problemcount}\, {#1}}}\medskip }
+	\addtocounter{problemcount}{1} 
+}
+
+%%% =========================================================================
+
+\newcommand{\handBS}{\noindent\textcolor{ForestGreen}{\Huge\ding{45}}}
+\NewDocumentEnvironment{note}{g g}{
+	\tikzstyle{mybox1} = [draw=YellowGreen, fill=green!15,very thick, rectangle, rounded corners, inner sep=10pt, inner ysep=20pt]
+	\tikzstyle{fancytitle1} =[fill=YellowGreen, text=white]
+	\tikzstyle{fancytitle2} =[fill=YellowGreen!5, text=white]
+	\tikzstyle{fancytitle3} =[fill=white, text=white]
+	\vskip 4mm
+	\begin{center}
+		\begin{tikzpicture}
+			\node [mybox1] (box)\bgroup
+			\IfValueTF{#2}{
+				\IfFileExists{#2}{\begin{minipage}{.85\textwidth}}{\begin{minipage}{.93\textwidth}}
+			}{%%
+				\IfFileExists{\MyPath images/icon/note.png}{\begin{minipage}{.85\textwidth}}{\begin{minipage}{.93\textwidth}}
+			}%%
+				\begin{RTL}
+}{%
+				\end{RTL}
+			\end{minipage}
+			\egroup;
+			\IfValueTF{#1}{\node[fancytitle1, left=10pt] at (box.north east) {\hboxR{#1}};}{\node[fancytitle1, left=10pt] at (box.north east) {\hboxR{نکته}};}%
+			\IfValueTF{#2}{
+				\IfFileExists{#2}
+				{\node[fancytitle3, left=3pt,   rounded corners] at (box.west) {\includegraphics[width=.07\textwidth]{#2}}; }
+				{\node[fancytitle2,  rounded corners] at (box.west) {\handBS};}			
+			}{%%
+				\IfFileExists{\MyPath images/icon/note.png}
+				{\node[fancytitle3, left=3pt,   rounded corners] at (box.west) {\includegraphics[width=.07\textwidth]{\MyPath images/icon/note}}; }
+				{\node[fancytitle2,  rounded corners] at (box.west) {\handBS};}
+			}%%
+		\end{tikzpicture}
+	\end{center}
+}%
+
+%%% =========================================================================
+
+\newcommand{\treeBS}{\noindent\textcolor{blue}{\Huge\ding{171}}}
+\NewDocumentEnvironment{goal}{g g}{
+	\tikzstyle{mybox1} = [draw=blue, fill=blue!15,very thick, rectangle, rounded corners, inner sep=10pt, inner ysep=20pt]
+	\tikzstyle{fancytitle1} =[fill=blue!90, text=white]
+	\tikzstyle{fancytitle2} =[fill=blue!5, text=white]
+	\tikzstyle{fancytitle3} =[fill=white, text=white]
+	\vskip 4mm
+	\begin{center}
+		\begin{tikzpicture}
+			\node [mybox1] (box)\bgroup
+			\IfValueTF{#2}{
+				\IfFileExists{#2}{\begin{minipage}{.85\textwidth}}{\begin{minipage}{.93\textwidth}}
+			}{%%
+				\IfFileExists{\MyPath images/icon/archeryf.pdf}{\begin{minipage}{.85\textwidth}}{\begin{minipage}{.93\textwidth}}
+			}%%
+				\begin{RTL}
+}{%
+				\end{RTL}
+			\end{minipage}
+			\egroup;
+			\IfValueTF{#1}{\node[fancytitle1, left=10pt] at (box.north east) {\hboxR{#1}};}{\node[fancytitle1, left=10pt] at (box.north east) {\hboxR{هدف}};}%
+			\IfValueTF{#2}{
+				\IfFileExists{#2}
+				{\node[fancytitle3, left=3pt,   rounded corners] at (box.west) {\includegraphics[width=.07\textwidth]{#2}}; }
+				{\node[fancytitle2,  rounded corners] at (box.west) {\treeBS};}			
+			}{%%
+				\IfFileExists{\MyPath images/icon/archeryf.pdf}
+				{\node[fancytitle3, left=3pt,   rounded corners] at (box.west) {\includegraphics[width=.07\textwidth]{\MyPath images/icon/archeryf}}; }
+				{\node[fancytitle2,  rounded corners] at (box.west) {\treeBS};}
+			}%%
+		\end{tikzpicture}
+	\end{center}
+}%
+
+%%% =========================================================================
+
+\newcommand{\arcBS}{\noindent\textcolor{red}{\Huge\ding{247}}}
+\NewDocumentEnvironment{warning}{g g}{
+	\tikzstyle{mybox1} = [draw=red, fill=red!15,very thick, rectangle, rounded corners, inner sep=10pt, inner ysep=20pt]
+	\tikzstyle{fancytitle1} =[fill=red!90, text=white]
+	\tikzstyle{fancytitle2} =[fill=red!4, text=white]
+	\tikzstyle{fancytitle3} =[fill=white, text=white]
+	\vskip 4mm
+	\begin{center}
+	\begin{tikzpicture}
+	\node [mybox1] (box)\bgroup
+	\IfValueTF{#2}{
+		\IfFileExists{#2}{\begin{minipage}{.85\textwidth}}{\begin{minipage}{.93\textwidth}}
+	}{%%
+		\IfFileExists{\MyPath images/icon/warining.png}{\begin{minipage}{.85\textwidth}}{\begin{minipage}{.93\textwidth}}
+	}%%
+		\begin{RTL}
+}{%
+		\end{RTL}
+	\end{minipage}
+	\egroup;
+	\IfValueTF{#1}{\node[fancytitle1, left=10pt] at (box.north east) {\hboxR{#1}};}{\node[fancytitle1, left=10pt] at (box.north east) {\hboxR{توجه}};}%
+	\IfValueTF{#2}{
+		\IfFileExists{#2}
+		{\node[fancytitle3, left=3pt,   rounded corners] at (box.west) {\includegraphics[width=.07\textwidth]{#2}}; }
+		{\node[fancytitle2,  rounded corners] at (box.west) {\arcBS};}			
+	}{%%
+		\IfFileExists{\MyPath images/icon/warining.png}
+		{\node[fancytitle3, left=3pt,   rounded corners] at (box.west) {\includegraphics[width=.07\textwidth]{\MyPath images/icon/warining.png}}; }
+		{\node[fancytitle2,  rounded corners] at (box.west) {\arcBS};}
+	}%%
+	\end{tikzpicture}
+	\end{center}
+}%
+
+%%% =========================================================================
+
+\newcommand{\envBS}{\noindent\textcolor{Violet}{\Huge\ding{41}}}
+\NewDocumentEnvironment{refer}{g g}{
+	\tikzstyle{mybox1} = [draw=Violet, fill=Violet!10,very thick, rectangle, rounded corners, inner sep=10pt, inner ysep=20pt]
+	\tikzstyle{fancytitle1} =[fill=Violet!50, text=white]
+	\tikzstyle{fancytitle2} =[fill=Violet!20, text=white]
+	\tikzstyle{fancytitle3} =[fill=white, text=white]
+	\vskip 4mm
+	\begin{center}
+	\begin{tikzpicture}
+	\node [mybox1] (box)\bgroup
+	\IfValueTF{#2}{
+		\IfFileExists{#2}{\begin{minipage}{.85\textwidth}}{\begin{minipage}{.93\textwidth}}
+	}{%%
+		\IfFileExists{\MyPath images/icon/referO.png}{\begin{minipage}{.85\textwidth}}{\begin{minipage}{.93\textwidth}}
+	}%%
+	\begin{RTL}
+}{%
+	\end{RTL}
+	\end{minipage}
+	\egroup;
+	\IfValueTF{#1}{\node[fancytitle1, left=10pt] at (box.north east) {\hboxR{#1}};}{\node[fancytitle1, left=10pt] at (box.north east) {\hboxR{مراجع مفید}};}%
+	\IfValueTF{#2}{
+		\IfFileExists{#2}
+		{\node[fancytitle3, left=3pt,   rounded corners] at (box.west) {\includegraphics[width=.07\textwidth]{#2}}; }
+		{\node[fancytitle2,  rounded corners] at (box.west) {\envBS};}			
+	}{%%
+		\IfFileExists{\MyPath images/icon/referO.png}
+		{\node[fancytitle3, left=3pt,   rounded corners] at (box.west) {\includegraphics[width=.07\textwidth]{\MyPath images/icon/referO}}; }
+		{\node[fancytitle2,  rounded corners] at (box.west) {\envBS};}
+	}%%
+	\end{tikzpicture}
+	\end{center}
+}%
+
+\newcommand{\goodRef}[1]{ \begin{refer} #1 \end{refer} }
+
+%%% ========================================================================
+
+\newcommand{\twoBS}{\noindent\textcolor{YellowOrange}{\Huge\ding{44}}}
+\NewDocumentEnvironment{info}{g g}{
+	\tikzstyle{mybox1} = [draw=YellowOrange, fill=YellowOrange!10,very thick, rectangle, rounded corners, inner sep=10pt, inner ysep=20pt]
+	\tikzstyle{fancytitle1} =[fill=YellowOrange!50, text=white]
+	\tikzstyle{fancytitle2} =[fill=YellowOrange!15, text=white]
+	\tikzstyle{fancytitle3} =[fill=white, text=white]
+	\vskip 4mm
+	\begin{center}
+	\begin{tikzpicture}
+	\node [mybox1] (box)\bgroup
+	\IfValueTF{#2}{
+		\IfFileExists{#2}{\begin{minipage}{.85\textwidth}}{\begin{minipage}{.93\textwidth}}
+	}{%%
+		\IfFileExists{\MyPath images/icon/infoRR.png}{\begin{minipage}{.85\textwidth}}{\begin{minipage}{.93\textwidth}}
+	}%%
+	\begin{RTL}
+}{%
+	\end{RTL}
+	\end{minipage}
+	\egroup;
+	\IfValueTF{#1}{\node[fancytitle1, left=10pt] at (box.north east) {\hboxR{#1}};}{\node[fancytitle1, left=10pt] at (box.north east) {\hboxR{مطالب بیشتر}};}%%
+	\IfValueTF{#2}{
+		\IfFileExists{#2}
+		{\node[fancytitle3, left=3pt,   rounded corners] at (box.west) {\includegraphics[width=.07\textwidth]{#2}}; }
+		{\node[fancytitle2,  rounded corners] at (box.west) {\twoBS};}			
+	}{%%
+		\IfFileExists{\MyPath images/icon/infoRR.png}
+		{\node[fancytitle3, left=3pt,   rounded corners] at (box.west) {\includegraphics[width=.07\textwidth]{\MyPath images/icon/infoRR}}; }
+		{\node[fancytitle2,  rounded corners] at (box.west) {\twoBS};}
+	}%%
+	\end{tikzpicture}
+	\end{center}
+}%
+
+
+%%% ========================================================================
+%
+\newcommand{\teleBS}{\noindent\textcolor{Mulberry}{\Huge\ding{37}}}
+\NewDocumentEnvironment{problem}{g g}{
+	\tikzstyle{mybox1} = [draw=Mulberry, fill=Mulberry!10,very thick, rectangle, rounded corners, inner sep=10pt, inner ysep=20pt]
+	\tikzstyle{fancytitle1} =[fill=Mulberry!50, text=white]
+	\tikzstyle{fancytitle2} =[fill=Mulberry!15, text=white]
+	\tikzstyle{fancytitle3} =[fill=white, text=white]
+	\vskip 4mm
+	\begin{center}
+	\begin{tikzpicture}
+	\node [mybox1] (box)\bgroup
+	\IfValueTF{#2}{
+		\IfFileExists{#2}{\begin{minipage}{.85\textwidth}}{\begin{minipage}{.93\textwidth}}
+	}{%%
+		\IfFileExists{\MyPath images/icon/home.png}{\begin{minipage}{.85\textwidth}}{\begin{minipage}{.93\textwidth}}
+	}%%
+	\linespread{1.5}
+	\begin{RTL}
+}{%
+	\end{RTL}
+	\end{minipage}
+	\egroup;
+	\IfValueTF{#1}{\node[fancytitle1, left=10pt] at (box.north east) {\hboxR{#1}};}{\node[fancytitle1, left=10pt] at (box.north east) {\hboxR{سوال}};}%%
+	\IfValueTF{#2}{
+		\IfFileExists{#2}
+		{\node[fancytitle3, left=3pt,   rounded corners] at (box.west) {\includegraphics[width=.07\textwidth]{#2}}; }
+		{\node[fancytitle2,  rounded corners] at (box.west) {\twoBS};}			
+	}{%%
+		\IfFileExists{\MyPath images/icon/home.png}
+		{\node[fancytitle3, left=3pt,   rounded corners] at (box.west) {\includegraphics[width=.07\textwidth]{\MyPath images/icon/home}}; }
+		{\node[fancytitle2,  rounded corners] at (box.west) {\teleBS};}
+	}%%
+	\end{tikzpicture}
+	\end{center}
+}%
+
+
+%%% ========================================================================
+%
+\newcommand{\defBS}{\noindent\textcolor{ForestGreen}{\Huge\ding{45}}}
+\NewDocumentEnvironment{mydef}{g g}{
+	\tikzstyle{mybox1} = [draw=Plum, fill=Plum!15,very thick, rectangle, rounded corners, inner sep=10pt, inner ysep=20pt]
+	\tikzstyle{fancytitle1} =[fill=Plum, text=white]
+	\tikzstyle{fancytitle2} =[fill=Plum!5, text=white]
+	\tikzstyle{fancytitle3} =[fill=white, text=white]
+	\vskip 4mm
+	\begin{center}
+		\begin{tikzpicture}
+			\node [mybox1] (box)\bgroup
+			\IfValueTF{#2}{
+				\IfFileExists{#2}{\begin{minipage}{.85\textwidth}}{\begin{minipage}{.93\textwidth}}
+			}{%%
+				\IfFileExists{defi.png}{\begin{minipage}{.85\textwidth}}{\begin{minipage}{.93\textwidth}}
+			}%%
+				\begin{RTL}
+}{%
+				\end{RTL}
+			\end{minipage}
+			\egroup;
+			\IfValueTF{#1}{\node[fancytitle1, left=10pt] at (box.north east) {\hboxR{#1}};}{\node[fancytitle1, left=10pt] at (box.north east) {\hboxR{تعریف}};}%
+			\IfValueTF{#2}{
+				\IfFileExists{#2}
+				{\node[fancytitle3, left=3pt,   rounded corners] at (box.west) {\includegraphics[width=.07\textwidth]{#2}}; }
+				{\node[fancytitle2,  rounded corners] at (box.west) {\defBS};}			
+			}{%%
+				\IfFileExists{\MyPath images/icon/defi.png}
+				{\node[fancytitle3, left=3pt,   rounded corners] at (box.west) {\includegraphics[width=.07\textwidth]{\MyPath images/icon/defi}}; }
+				{\node[fancytitle2,  rounded corners] at (box.west) {\defBS};}
+			}%%
+		\end{tikzpicture}
+	\end{center}
+}%
+
+
+%%% =========================================================================
+%
+\newcommand{\commentBSS}{\noindent\textcolor{ForestGreen}{\Huge\ding{23}}}
+\NewDocumentEnvironment{mycomment}{g g}{
+	\tikzstyle{mybox1} = [draw=red,fill=none,very thick, rectangle, rounded corners, inner sep=10pt, inner ysep=20pt]
+	\tikzstyle{fancytitle1} =[fill=red, text=white]
+	\tikzstyle{fancytitle2} =[fill=red!5, text=white]
+	\tikzstyle{fancytitle3} =[fill=white, text=white]
+	\vskip 4mm
+	\begin{center}
+		\begin{tikzpicture}
+			\node [mybox1] (box)\bgroup
+			\IfValueTF{#2}{
+				\IfFileExists{#2}{\begin{minipage}{.85\textwidth}}{\begin{minipage}{.93\textwidth}}
+			}{%%
+				\IfFileExists{robah.png}{\begin{minipage}{.85\textwidth}}{\begin{minipage}{.93\textwidth}}
+			}%%
+				\begin{RTL}
+}{%
+				\end{RTL}
+			\end{minipage}
+			\egroup;
+			\IfValueTF{#1}{\node[fancytitle1, left=10pt] at (box.north east) {\hboxR{#1}};}{\node[fancytitle1, left=10pt] at (box.north east) {\hboxR{توضیح}};}%
+			\IfValueTF{#2}{
+				\IfFileExists{#2}
+				{\node[fancytitle3, left=3pt,   rounded corners] at (box.west) {\includegraphics[width=.07\textwidth]{#2}}; }
+				{\node[fancytitle2,  rounded corners] at (box.west) {\commentBSS};}			
+			}{%%
+				\IfFileExists{robah.png}
+				{\node[fancytitle3, left=3pt,   rounded corners] at (box.west) {\includegraphics[width=.07\textwidth]{\MyPath images/icon/robah}}; }
+				{\node[fancytitle2,  rounded corners] at (box.west) {\commentBSS};}
+			}%%
+		\end{tikzpicture}
+	\end{center}
+}%
+
+
+%%% ===========================================================================
+%
+\newtheoremstyle{ntdefinitionstyle}% name of the style to be used
+  {\topsep}% measure of space to leave above the theorem. E.g.: 3pt
+  {\topsep}% measure of space to leave below the theorem. E.g.: 3pt
+  {}% name of font to use in the body of the theorem
+  {0pt}% measure of space to indent
+  {\bfseries\color{nttitle}}% name of head font
+  {}% punctuation between head and body
+  {.5em}% space after theorem head; " " = normal interword space
+  {}% Manually specify head  
+
+\newtheoremstyle{nttheoremstyle}% name of the style to be used
+  {\topsep}% measure of space to leave above the theorem. E.g.: 3pt
+  {\topsep}% measure of space to leave below the theorem. E.g.: 3pt
+  {}% name of font to use in the body of the theorem
+  {0pt}% measure of space to indent
+  {\bfseries\color{nttitle}}% name of head font
+  {}% punctuation between head and body
+  {.2em}% space after theorem head; " " = normal interword space
+  {}% Manually specify head
+  
+\newtheoremstyle{ntplainstyle}% name of the style to be used
+  {\topsep}% measure of space to leave above the theorem. E.g.: 3pt
+  {\topsep}% measure of space to leave below the theorem. E.g.: 3pt
+  {\itshape}% name of font to use in the body of the theorem
+  {0pt}% measure of space to indent
+  {\bfseries\color{nttitle}}% name of head font
+  {}% punctuation between head and body
+  {.5em}% space after theorem head; " " = normal interword space
+  {}% Manually specify head  
+
+
+\definecolor{nttitle}{RGB}{0,177,235}
+% رنگ آبی کم‌رنگ پس‌زمینه محیط قضیه و محیط lstlisting
+\definecolor{ntback}{RGB}{212,237,255}
+% رنگ سبز صفحه عنوان فارسی و انگلیسی کتاب، قسمت‌ها و محیط ntpoint
+\definecolor{ntsec}{RGB}{204,233,157}
+% رنگ قهوه‌ای محیط تعریف
+\definecolor{ntdef}{RGB}{205,0,205}
+
+\definecolor{ntexp}{RGB}{224,110,12}
+
+
+\mdfdefinestyle{theoremstyle}{%
+hidealllines=true,
+frametitlerule=false,
+innerrightmargin=5pt,
+innerleftmargin=5pt,
+frametitlerulewidth=0pt,
+frametitlefont=\color{white}\large\bfseries,
+linewidth=2pt,%
+frametitlerule=true,%
+frametitlebackgroundcolor=nttitle,
+innertopmargin=\topskip,
+skipabove=.7\baselineskip,
+skipbelow=1.8\baselineskip,
+backgroundcolor=nttitle!15,
+startinnercode={\baselineskip=.9cm},
+startcode={\vspace{.8\topsep}},
+splitbottomskip=10pt,
+theoremseparator={},
+needspace=4\baselineskip
+align=center,
+}
+
+\mdfdefinestyle{theoremstylePres}{%
+hidealllines=true,
+frametitlerule=false,
+innerrightmargin=5pt,
+innerleftmargin=5pt,
+frametitlerulewidth=0pt,
+frametitlefont=\color{white}\large\bfseries,
+linewidth=2pt,%
+frametitlerule=true,%
+frametitlebackgroundcolor=nttitle,
+innertopmargin=\topskip,
+skipabove=.7\baselineskip,
+skipbelow=1.8\baselineskip,
+backgroundcolor=nttitle!15,
+startinnercode={\baselineskip=1.7cm},
+startcode={\vspace{.8\topsep}},
+splitbottomskip=10pt,
+theoremseparator={},
+needspace=4\baselineskip
+align=center,
+}
+
+\makeatletter
+
+\ifthenelse{\equal{\@docStyle}{Pres}}
+{\mdtheorem[style=theoremstylePres]{nttheorem}[theorem]{\hspace*{1pt}\LARGE قضیه}}
+{\mdtheorem[style=theoremstyle]{nttheorem}[theorem]{\hspace*{1pt}قضیه}}
+
+\newcounter{ntcounter}
+
+\ifthenelse{\equal{\@depRe}{chapter}}{
+	\renewcommand\thentcounter{\thechapter\@SepMark\arabic{ntcounter}}
+}{
+	\ifthenelse{\equal{\@depRe}{section}}{
+		\renewcommand\thentcounter{\thesection\@SepMark\arabic{ntcounter}}
+	}
+	{
+		\renewcommand\thentcounter{\arabic{ntcounter}}
+	}
+}
+\makeatother 
+
+
+%% ==========================================================================
+%تعریف محیط 
+%ntpoint
+\makeatletter
+\ifthenelse{\equal{\@docStyle}{Pres}}{
+	\newenvironment{ntpoint}[1][\empty]{\par\begin{mdframed}[
+	hidealllines=true,
+	innertopmargin=9pt,
+	skipabove=.9\baselineskip,
+	innermargin=\dimexpr-\marginparwidth-\marginparsep\relax,
+	innerbottommargin=9pt,
+	innerrightmargin=5pt,innerleftmargin=5pt,
+	backgroundcolor=ntsec,
+	  singleextra={
+	      \node[
+	        overlay,
+	        inner ysep=7pt,
+	       inner xsep=9pt,
+	        anchor=east,
+	       % text width=1.2cm,
+	       % align=left,
+	        minimum height=4ex,
+	        fill=nttitle,
+	        yshift=-5.2mm,
+	        xshift=0mm,
+	        %rounded corners=3pt,
+	        font=\color{white}\bfseries
+	      ] at (P) {\rl{نکته~\thentcounter}};
+	        \draw[white,fill=white] ($(P)-(0pt,1.65mm)$) -- ($(P)-(0pt,8.8mm)$) -- ($(P)-(7pt,5.225mm)$) -- cycle;
+	      },
+	   firstextra={
+	      \node[
+	       overlay,
+	        inner ysep=7pt,
+	       inner xsep=9pt,
+	        anchor=east,
+	       % text width=1.2cm,
+	       % align=left,
+	        minimum height=4ex,
+	        fill=nttitle,
+	        yshift=-5.2mm,
+	        xshift=0mm,
+	        %rounded corners=3pt,
+	        font=\color{white}\bfseries
+	      ] at (P) {\rl{نکته~\thentcounter}};
+	        \draw[white,fill=white] ($(P)-(0pt,1.65mm)$) -- ($(P)-(0pt,8.8mm)$) -- ($(P)-(7pt,5.225mm)$) -- cycle;
+	      },
+	]
+	\linespread{1.5}
+	\refstepcounter{ntcounter}
+	\textbf{\ifx\empty#1\hspace*{2.4cm}\relax\else\hspace*{1.95cm}(#1)\fi}%\\[.2cm]%
+	\noindent\ignorespaces%
+	\noindent}{\end{mdframed}\par}
+}
+{
+	\newenvironment{ntpoint}[1][\empty]{\par\begin{mdframed}[
+	hidealllines=true,
+	innertopmargin=9pt,
+	skipabove=.9\baselineskip,
+	innermargin=\dimexpr-\marginparwidth-\marginparsep\relax,
+	innerbottommargin=9pt,
+	innerrightmargin=5pt,innerleftmargin=5pt,
+	backgroundcolor=ntsec,
+	  singleextra={
+		\node[
+		overlay,
+		inner ysep=7pt,
+		inner xsep=9pt,
+		anchor=east,
+		% text width=1.2cm,
+		% align=left,
+		minimum height=4ex,
+		fill=nttitle,
+		yshift=-5.2mm,
+		xshift=0mm,
+		%rounded corners=3pt,
+		font=\color{white}\bfseries
+		] at (P) {\rl{نکته~\thentcounter}};
+		\draw[white,fill=white] ($(P)-(0pt,1.65mm)$) -- ($(P)-(0pt,8.8mm)$) -- ($(P)-(7pt,5.225mm)$) -- cycle;
+	      },
+	   firstextra={
+		\node[
+		overlay,
+		inner ysep=7pt,
+		inner xsep=9pt,
+		anchor=east,
+		% text width=1.2cm,
+		% align=left,
+		minimum height=4ex,
+		fill=nttitle,
+		yshift=-5.2mm,
+		xshift=0mm,
+		%rounded corners=3pt,
+		font=\color{white}\bfseries
+		] at (P) {\rl{نکته~\thentcounter}};
+		\draw[white,fill=white] ($(P)-(0pt,1.65mm)$) -- ($(P)-(0pt,8.8mm)$) -- ($(P)-(7pt,5.225mm)$) -- cycle;
+	      },
+	]
+	\linespread{1.5}
+	\refstepcounter{ntcounter}
+	\textbf{\ifx\empty#1\hspace*{1.9cm}\relax\else\hspace*{1.65cm}(#1)\fi}%\\[.2cm]%
+	\noindent\ignorespaces%
+	\noindent}{\end{mdframed}\par}
+}
+\ifthenelse{\equal{\@depRe}{none}}{}{\@addtoreset{ntcounter}{\@depRe}}
+\makeatother
+
+
+%% ==========================================================================
+% تعریف محیط ntexample
+\makeatletter
+\ifthenelse{\equal{\@docStyle}{Pres}}
+{
+	\newenvironment{ntexample}[1][\empty]{\par\begin{mdframed}[roundcorner=10pt,,align=right,skipabove=.5\baselineskip,
+	skipbelow=.3\baselineskip,
+	innertopmargin=10pt,
+	innerbottommargin=12pt,
+	usetwoside=false,
+	innerrightmargin=10pt,
+	rightmargin=3pt,
+	innerleftmargin=0pt,
+	%outermargin=1pt,
+	%backgroundcolor=brown!25,
+	 topline=false,bottomline=false,leftline=false,
+	middlelinewidth=8pt,
+	%splittopskip=-15pt,
+	splitbottomskip=5pt,
+	middlelinecolor=ntexp,
+	  singleextra={
+	      \node[
+		overlay,
+		outer sep=0pt,
+		anchor=north west,
+		text width=2.4cm,
+		minimum height=4ex,
+		fill=ntexp,
+		yshift=-2mm,
+		xshift=-21mm,
+		%rounded corners=3pt,
+		font=\color{white}\bfseries
+	      ] at (P) {\rl{مثال~\theexample}};
+	      },
+	   firstextra={
+	      \node[
+		overlay,
+		outer sep=0pt,
+		anchor=north west,
+		text width=2.4cm,
+		minimum height=4ex, 
+		fill=ntexp,
+		yshift=-2mm,
+		xshift=-21mm,
+		%rounded corners=3pt,
+		font=\color{white}\bfseries
+	      ] at (P) {\rl{مثال~\theexample}};
+	      },
+	]
+	\linespread{1.5}
+	\refstepcounter{example}
+	\hspace*{1.95cm}\textbf{\ifx\empty#1\space\relax\else\space\textcolor{nttitle}{#1}\space \ \fi}%\\[.2cm]%
+	%\noindent\ignorespaces%
+	}{\end{mdframed}\par}
+}
+{
+	\newenvironment{ntexample}[1][\empty]{\par\begin{mdframed}[roundcorner=10pt,,align=right,skipabove=.5\baselineskip,
+	skipbelow=.3\baselineskip,
+	innertopmargin=10pt,
+	innerbottommargin=12pt,
+	usetwoside=false,
+	innerrightmargin=10pt,
+	rightmargin=3pt,
+	innerleftmargin=0pt,
+	%outermargin=1pt,
+	%backgroundcolor=brown!25,
+	 topline=false,bottomline=false,leftline=false,
+	middlelinewidth=8pt,
+	%splittopskip=-15pt,
+	splitbottomskip=5pt,
+	middlelinecolor=ntexp,
+	  singleextra={
+	      \node[
+		overlay,
+		outer sep=0pt,
+		anchor=north west,
+		text width=2.1cm,
+		minimum height=4ex,
+		fill=ntexp,
+		yshift=-2mm,
+		xshift=-21mm,
+		%rounded corners=3pt,
+		font=\color{white}\bfseries
+	      ] at (P) {\rl{مثال~\theexample}};
+	      },
+	   firstextra={
+	      \node[
+		overlay,
+		outer sep=0pt,
+		anchor=north west,
+		text width=2.1cm,
+		minimum height=4ex, 
+		fill=ntexp,
+		yshift=-2mm,
+		xshift=-21mm,
+		%rounded corners=3pt,
+		font=\color{white}\bfseries
+	      ] at (P) {\rl{مثال~\theexample}};
+	      },
+	]
+	\linespread{1.5}
+	\refstepcounter{example}
+	\hspace*{1.8cm}\textbf{\ifx\empty#1\space\relax\else\space\textcolor{nttitle}{#1}\space \ \fi}%\\[.2cm]%
+	%\noindent\ignorespaces%
+	}{\end{mdframed}\par}
+}
+\makeatother
+\def\ntexampleautorefname{مثال}
+
+
+%% ======================================================================
+%
+\makeatletter
+\newenvironment{ntremember}[1][\empty]{\par\begin{mdframed}[roundcorner=10pt,,align=right,skipabove=.5\baselineskip,
+skipbelow=.3\baselineskip,
+innertopmargin=10pt,
+innerbottommargin=12pt,
+usetwoside=false,
+innerrightmargin=10pt,
+rightmargin=3pt,
+innerleftmargin=0pt,
+%outermargin=1pt,
+%backgroundcolor=brown!25,
+ topline=false,bottomline=false,leftline=false,
+middlelinewidth=8pt,
+%splittopskip=-15pt,
+splitbottomskip=5pt,
+middlelinecolor=ForestGreen,
+  singleextra={
+      \node[
+        overlay,
+        outer sep=0pt,
+        anchor=north west,
+        text width=2.1cm,
+        minimum height=4ex,
+        fill=ForestGreen,
+        yshift=-2mm,
+        xshift=-21mm,
+        %rounded corners=3pt,
+        font=\color{white}\bfseries
+      ] at (P) {\rl{یادآوری}};
+      },
+   firstextra={
+      \node[
+        overlay,
+        outer sep=0pt,
+        anchor=north west,
+        text width=2.1cm,
+        minimum height=4ex, 
+        fill=ForestGreen,
+        yshift=-2mm,
+        xshift=-21mm,
+        %rounded corners=3pt,
+        font=\color{white}\bfseries
+      ] at (P) {\rl{یادآوری}};
+      },
+]
+	\linespread{1.5}
+\hspace*{1.8cm}\textbf{\ifx\empty#1\space\relax\else\space\textcolor{nttitle}{#1}\space \ \fi}%\\[.2cm]%
+%\noindent\ignorespaces%
+}{\end{mdframed}\par}
+\makeatother
+
+
+%% ======================================================================
+%
+\makeatletter
+\ifthenelse{\equal{\@docStyle}{Pres}}{
+	\newenvironment{ntdefinition}[1][\empty]{\par\begin{mdframed}[roundcorner=10pt,align=right,
+	skipabove=.5\baselineskip,
+	skipbelow=.3\baselineskip,
+	innertopmargin=10pt,
+	innerbottommargin=12pt,
+	usetwoside=false,
+	innerrightmargin=10pt,
+	rightmargin=3pt,
+	innerleftmargin=0pt,
+	%outermargin=1pt,
+	%backgroundcolor=brown!25,
+	topline=false,bottomline=false,leftline=false,
+	middlelinewidth=8pt,
+	%splittopskip=-15pt,
+	splitbottomskip=5pt,
+	middlelinecolor=ntdef,
+	  singleextra={
+	      \node[
+	        overlay,
+	        outer sep=0pt,
+	        anchor=north west,
+	        text width=2.4cm,
+	        minimum height=4ex,
+	        fill=ntdef,
+	        yshift=-2mm,
+	        xshift=-19mm,
+	        %rounded corners=3pt,
+	        font=\color{white}\bfseries
+	      ]     at (P) {\rl{~تعریف~\thedefinition}};
+	      },
+	   firstextra={
+	      \node[
+	        overlay,
+	        outer sep=0pt,
+	        anchor=north west,
+	        text width=2.4cm,
+	        minimum height=4ex, 
+	        fill=ntdef,
+	        yshift=-2mm,
+	        xshift=-19mm,
+	        %rounded corners=3pt,
+	        font=\color{white}\bfseries
+	      ] at (P) {\rl{~تعریف~\thedefinition}};
+	      },
+	]
+	\linespread{1.5}
+	\refstepcounter{definition}
+	\hspace*{2.5cm}\textbf{\ifx\empty#1\space\relax\else\space\textcolor{nttitle}{#1}\space \ \fi}
+	%\noindent\ignorespaces%
+	}{\end{mdframed}\par}
+}
+{
+	\newenvironment{ntdefinition}[1][\empty]{\par\begin{mdframed}[roundcorner=10pt,align=right,
+	skipabove=.5\baselineskip,
+	skipbelow=.3\baselineskip,
+	innertopmargin=10pt,
+	innerbottommargin=12pt,
+	usetwoside=false,
+	innerrightmargin=10pt,
+	rightmargin=3pt,
+	innerleftmargin=0pt,
+	%outermargin=1pt,
+	%backgroundcolor=brown!25,
+	topline=false,bottomline=false,leftline=false,
+	middlelinewidth=8pt,
+	%splittopskip=-15pt,
+	splitbottomskip=5pt,
+	middlelinecolor=ntdef,
+	  singleextra={
+	      \node[
+	        overlay,
+	        outer sep=0pt,
+	        anchor=north west,
+	        text width=2.1cm,
+	        minimum height=4ex,
+	        fill=ntdef,
+	        yshift=-2mm,
+	        xshift=-21mm,
+	        %rounded corners=3pt,
+	        font=\color{white}\bfseries
+	      ]     at (P) {\rl{تعریف~\thedefinition}};
+	      },
+	   firstextra={
+	      \node[
+	        overlay,
+	        outer sep=0pt,
+	        anchor=north west,
+	        text width=2.1cm,
+	        minimum height=4ex, 
+	        fill=ntdef,
+	        yshift=-2mm,
+	        xshift=-21mm,
+	        %rounded corners=3pt,
+	        font=\color{white}\bfseries
+	      ] at (P) {\rl{تعریف~\thedefinition}};
+	      },
+	]
+	\linespread{1.5}
+	\refstepcounter{definition}
+	\hspace*{1.9cm}\textbf{\ifx\empty#1\space\relax\else\space\textcolor{nttitle}{#1}\space \ \fi}
+	%\noindent\ignorespaces%
+	}{\end{mdframed}\par}
+}
+\makeatother
+
+%% ==========================================================================
+% تعریف محیط ntsolution
+\newenvironment{ntsolution}{\par\begin{mdframed}[skipabove=.7\baselineskip,
+innertopmargin=0pt,
+innerbottommargin=0pt,
+innerrightmargin=8pt,innerleftmargin=0pt,
+outermargin=-1pt,
+%backgroundcolor=green,
+ topline=false,bottomline=false,leftline=false,
+middlelinewidth=8pt,
+middlelinecolor=nttitle,
+]
+	\linespread{1.5}
+\textbf{\textcolor{nttitle}{حل}}\ \
+\noindent}{\end{mdframed}\par}
+
+
+%% =============================================================
+% تعریف محیط ntproblems برای حروف‌چینی تمرین‌های پایان فصل‌ها
+\makeatletter
+\newenvironment{ntproblems}[1][تمرین‌]{%
+\renewcommand{\thesection}{}
+\phantomsection\addcontentsline{toc}{section}{\hspace*{2pt}#1}
+\vspace*{.7\baselineskip}
+\needspace{5\baselineskip}
+%\begin{fullwidth}
+\par
+\begin{mdframed}[%outermargin=\dimexpr-\marginparwidth-\marginparsep\relax,align=center,%skipabove=.7\baselineskip,
+%skipbelow=.1\baselineskip,
+innertopmargin=9pt,
+innerbottommargin=9pt,
+%outermargin=-5pt,
+usetwoside=false,
+rightmargin=0pt,
+innerrightmargin=5pt,innerleftmargin=0pt,
+backgroundcolor=nttitle!15,
+topline=false,
+bottomline=false,leftline=false,
+middlelinewidth=20pt,
+middlelinecolor=nttitle,
+]
+\normalfont\Large\bfseries #1
+\end{mdframed}%
+%\end{fullwidth}
+\vspace*{-.5\baselineskip}
+\sectionmark{#1}
+\renewcommand\theenumi{\color{nttitle}\bfseries\thechapter\@SepMark\arabic{enumi}}
+\renewcommand\labelenumi{\theenumi}
+\let\p@enumii\@empty
+\setlength{\columnsep}{5ex}
+%\begin{adjmulticols*}{2}{-\dimexpr+\marginparwidth+\marginparsep\relax}{}
+%\begin{enumerate}[align=left,itemindent=0pt,labelwidth=5ex,leftmargin=6ex]%
+}{
+%\end{enumerate}
+%\raggedcolumns
+%\end{adjmulticols*}
+}
+\makeatother
+
+
+%% ==========================================================
+% تعریف محیط ntsolutions برای حروف‌چینی پاسخ تمرین‌ها
+\newenvironment{ntsolutions}{%
+\setlength{\columnsep}{5ex}
+\begin{adjmulticols*}{2}{-\dimexpr+\marginparwidth+\marginparsep\relax}{}
+}
+{
+\raggedcolumns
+\end{adjmulticols*}
+}  
+
+
+%% ==============================================================
+% تعریف دستور ntchsol برای مشخص کردن پاسخ‌های مربوط به هر فصل در محیط ntsolutions
+\newcommand{\ntchsol}[1]{
+%\vspace*{.7\baselineskip}
+%\needspace{4\baselineskip}
+\par
+\begin{mdframed}[%outermargin=\dimexpr-\marginparwidth-\marginparsep\relax,align=center,
+skipabove=.7\baselineskip,
+%skipbelow=.1\baselineskip,
+innertopmargin=9pt,
+innerbottommargin=9pt,
+%outermargin=-5pt,
+usetwoside=false,
+rightmargin=0pt,
+innerrightmargin=5pt,innerleftmargin=0pt,
+backgroundcolor=nttitle!15,
+topline=false,
+bottomline=false,leftline=false,
+middlelinewidth=20pt,
+middlelinecolor=nttitle,
+]
+\normalfont\Large\bfseries #1
+\end{mdframed}%
+%\end{fullwidth}
+\vspace*{-.5\baselineskip}
+}
+
+
+%% ===============================================================================
+% put color to \boxed math command
+\makeatletter
+\renewcommand{\boxed}[2]{%
+\tikz[baseline]\node [rectangle, minimum width=1ex,rounded corners=3mm,draw,fill=#1,draw=none,anchor=base] {$\displaystyle#2$};}
+ \makeatother
+
+\makeatletter
+\newcommand{\boxedT}[2]{%
+\tikz[baseline]\node [rectangle, minimum width=1ex,rounded corners=3mm,draw,fill=#1,draw=none,anchor=base] {#2};}
+ \makeatother

@@ -1,0 +1,12 @@
+\clearpage
+\begin{latin}
+\section*{Abstract}
+
+Automated UI testing for Qt C++ desktop applications has largely been limited to commercial tools; existing open-source options provide only raw infrastructure (a driver and a protocol) without architectural layers. This thesis presents the design and implementation of an open-source End-to-End (E2E) testing framework for Qt-based Windows desktop applications. The framework builds on WinAppDriver/Appium and adds five architectural layers: element location with a handle cache and scoped finds, page objects, a domain-specific language, a driver factory with phase attachment, and database isolation with reporting. Two stability contracts (stable identifiers and the readout contract) formalize the relationship between the target application and the framework, turning the testing of graphical charts into testing readable data.
+
+For evaluation, a demo application, the Iran Signal Tracker (Qt and SQLite based), was built with deliberately hard-to-test flows: multi-window authentication, cascading filters, pagination, table virtualization, charts, and reporting. Twenty-five E2E scenarios were implemented; the full run is stable, reproducible, and completes in about six minutes, producing an interactive Allure report with failure screenshots. A CI/CD migration path is also designed.
+
+\vskip 5mm
+\textbf{Key Words}: End-to-End Testing, UI Automation, Qt, WinAppDriver, Appium, Domain-Specific Language, Page Object
+
+\end{latin}
