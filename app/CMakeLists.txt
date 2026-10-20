@@ -11,6 +11,8 @@ qt_add_executable(IranSignalTracker WIN32
     src/main.cpp
     src/mainwindow.h
     src/mainwindow.cpp
+    src/signin_dialog.h
+    src/signin_dialog.cpp
     src/db.h
     src/db.cpp
 )
@@ -20,6 +22,8 @@ qt_add_executable(app_smoke
     tests/smoke_main.cpp
     src/mainwindow.h
     src/mainwindow.cpp
+    src/signin_dialog.h
+    src/signin_dialog.cpp
     src/db.h
     src/db.cpp
 )

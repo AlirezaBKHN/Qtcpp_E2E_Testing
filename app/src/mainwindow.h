@@ -16,7 +16,15 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    MainWindow(QWidget* parent = nullptr);
+    explicit MainWindow(const QString& user, QWidget* parent = nullptr);
+
+    // The signed-in username shown in the top bar (Task 4 wiring).
+    QString currentUser() const { return currentUser_; }
+
+    // True when the window was closed without a logout (X button) - the
+    // sign-in loop in main.cpp exits the app in that case; logout instead
+    // reopens SignInDialog.
+    bool shouldExit() const { return shouldExit_; }
 
 private slots:
     void onSearch();
@@ -24,6 +32,7 @@ private slots:
     void onReset();
     void onExport();
     void onProvinceChanged(int index);
+    void onLogout();
 
 private:
     void refreshChart();
@@ -43,4 +52,12 @@ private:
 
     QBarCategoryAxis* axisX = nullptr;
     QValueAxis* axisY = nullptr;
+
+protected:
+    void closeEvent(QCloseEvent* event) override;
+
+private:
+    bool loggingOut_ = false;
+    bool shouldExit_ = false;
+    QString currentUser_;
 };

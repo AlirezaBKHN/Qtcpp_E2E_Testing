@@ -7,6 +7,7 @@
 #include <QtCharts/QChartView>
 #include <QtCharts/QValueAxis>
 
+#include <QCloseEvent>
 #include <QDateTime>
 #include <QDir>
 #include <QFont>
@@ -55,8 +56,9 @@ void repopulateCombo(QComboBox* combo, const QStringList& values)
 
 } // namespace
 
-MainWindow::MainWindow(QWidget* parent)
+MainWindow::MainWindow(const QString& user, QWidget* parent)
     : QMainWindow(parent)
+    , currentUser_(user)
 {
     setWindowTitle(QString::fromLatin1(kTitle));
     resize(1100, 700);
@@ -294,4 +296,20 @@ void MainWindow::refreshChart()
     chart->setTitle(group == QStringLiteral("operator")
                         ? tr("Average Signal Quality by Operator")
                         : tr("Average Signal Quality by Technology"));
+}
+
+void MainWindow::closeEvent(QCloseEvent* event)
+{
+    // A close that did not come from a logout means the user quit the app:
+    // the sign-in loop in main.cpp exits. Logout first sets loggingOut_ so
+    // the loop instead reopens SignInDialog.
+    if (!loggingOut_)
+        shouldExit_ = true;
+    QMainWindow::closeEvent(event);
+}
+
+void MainWindow::onLogout()
+{
+    loggingOut_ = true;
+    close();
 }

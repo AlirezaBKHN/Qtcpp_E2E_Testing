@@ -1,5 +1,7 @@
 #include <QApplication>
 #include <QComboBox>
+#include <QLabel>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QSplitter>
 #include <QtCharts/QAbstractBarSeries>
@@ -10,6 +12,7 @@
 #include <QtTest>
 #include "db.h"
 #include "mainwindow.h"
+#include "signin_dialog.h"
 
 // Smoke: MainWindow must construct with every mandatory stable identifier,
 // each set on BOTH objectName and accessibleName (plan Global Constraints).
@@ -18,6 +21,8 @@ class SmokeMain : public QObject {
 private slots:
     void mandatoryIdentifiersPresent();
     void chartShowsValueLabelsAndData();
+    void signinGateBlocksMainWindow();
+    void registerModeValidation();
 };
 
 static const char* kIds[] = {
@@ -28,7 +33,7 @@ static const char* kIds[] = {
 
 void SmokeMain::mandatoryIdentifiersPresent()
 {
-    MainWindow w;
+    MainWindow w(QStringLiteral("admin"));
     w.show();
     for (const char* id : kIds) {
         QWidget* found = w.findChild<QWidget*>(QString::fromLatin1(id));
@@ -83,12 +88,66 @@ int main(int argc, char** argv)
     return QTest::qExec(&t, argc, argv);
 }
 
+// The sign-in dialog gates the app: it is the signinWindow and carries the
+// login-mode ids (dialog is constructed directly; the main.cpp loop is the
+// runtime gate this slot pins the contract of).
+void SmokeMain::signinGateBlocksMainWindow()
+{
+    SignInDialog d;
+    d.show();
+    QCOMPARE(d.objectName(), QStringLiteral("signinWindow"));
+    QCOMPARE(d.accessibleName(), QStringLiteral("signinWindow"));
+    const char* ids[] = {"usernameField", "passwordField", "loginButton",
+                         "registerToggle", "signinStatus"};
+    for (const char* id : ids) {
+        QWidget* found = d.findChild<QWidget*>(QString::fromLatin1(id));
+        QVERIFY2(found, qPrintable(QString("missing sign-in child: %1").arg(id)));
+        QCOMPARE(QString::fromLatin1(id), found->objectName());
+        QCOMPARE(QString::fromLatin1(id), found->accessibleName());
+    }
+    // Register mode is NOT active initially: registerButton is present for
+    // the in-place toggle but hidden; loginButton is the visible action.
+    auto* registerButton = d.findChild<QPushButton*>(QString::fromLatin1("registerButton"));
+    QVERIFY(registerButton != nullptr);
+    QVERIFY2(!registerButton->isVisible(), "register mode active on a fresh dialog");
+    auto* loginButton = d.findChild<QPushButton*>(QString::fromLatin1("loginButton"));
+    QVERIFY(loginButton != nullptr);
+    QVERIFY2(loginButton->isVisible(), "login action must be visible initially");
+}
+
+// Register mode validation: only non-empty password + unique username.
+void SmokeMain::registerModeValidation()
+{
+    SignInDialog d;
+    d.show();
+    auto* toggle = d.findChild<QPushButton*>(QString::fromLatin1("registerToggle"));
+    QVERIFY(toggle != nullptr);
+    toggle->click();
+
+    auto* registerButton =
+        d.findChild<QPushButton*>(QString::fromLatin1("registerButton"));
+    QVERIFY2(registerButton != nullptr && registerButton->isVisible(),
+             "register mode did not switch in place");
+    auto* username =
+        d.findChild<QLineEdit*>(QString::fromLatin1("usernameField"));
+    QVERIFY(username);
+    username->setText(QStringLiteral("smoke_new_user"));
+
+    // Empty password -> pinned copy, no registration attempt.
+    auto* registerButtonClicked = registerButton;
+    registerButtonClicked->click();
+    auto* status = d.findChild<QLabel*>(QString::fromLatin1("registerStatus"));
+    QVERIFY(status != nullptr);
+    QCOMPARE(status->text(), QStringLiteral("Password can not be empty."));
+    QVERIFY(!d.findChild<QLabel*>(QString::fromLatin1("signinStatus"))->isVisible());
+}
+
 // The chart must be readable as data, not just a graphic: per-bar value
 // labels visible (outside end, one decimal) and the series must equal the
 // aggregates the Db layer produces for the same un-filtered group-by.
 void SmokeMain::chartShowsValueLabelsAndData()
 {
-    MainWindow w;
+    MainWindow w(QStringLiteral("admin"));
     w.show();
     QTest::qWait(50);
 
