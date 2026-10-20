@@ -342,7 +342,11 @@ FilterBindings Db::queryFilters(const QString& province, const QString& city,
                   " sample_time FROM cells";
     if (!clauses.isEmpty())
         sql += " WHERE " + clauses.join(" AND ");
-    sql += " ORDER BY province, city, operator, technology";
+    // Owner directive (spec 2026-10-20): province groups, id-ordered
+    // within - a total order (id is INTEGER PRIMARY KEY) pagination
+    // can slice deterministically. writeExportCsv iterates queryFilters,
+    // so the CSV export order matches the table order automatically.
+    sql += " ORDER BY province, id";
 
     QSqlQuery q(db);
     q.prepare(sql);

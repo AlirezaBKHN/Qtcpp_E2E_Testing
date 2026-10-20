@@ -95,6 +95,30 @@ int main(int argc, char* argv[])
         const auto rows = Db::queryFilters("Fars", "Tabriz", QString(), QString());
         CHECK(rows.isEmpty());
     }
+    // queryFilters order (spec 2026-10-20): provinces in contiguous ascending
+    // blocks, ids strictly ascending within each block - the total order
+    // pagination slices (page k = rows [(k-1)*size, k*size)).
+    {
+        const auto rows = Db::queryFilters(QString(), QString(), QString(), QString());
+        CHECK(!rows.isEmpty());
+        QString prevProvince;
+        int prevId = -1;
+        bool firstRow = true;
+        for (const auto& row : rows) {
+            const QString province = row.at(1).toString();
+            const int id = row.at(0).toInt();
+            if (firstRow || province != prevProvince) {
+                if (!firstRow)
+                    CHECK(province > prevProvince); // contiguous alphabetical blocks
+                prevProvince = province;
+                prevId = -1;
+                firstRow = false;
+            } else {
+                CHECK(id > prevId); // ascending ids within the block
+            }
+            prevId = id;
+        }
+    }
 
     // 5. avgBy groups to exactly operator-size with sane averages.
     {
