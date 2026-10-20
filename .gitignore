@@ -2,8 +2,7 @@
 build*/
 
 # Test & report artifacts (tracked: reports/export/.gitkeep, committed DB)
-reports/allure-results/
-reports/allure-report/
+reports/runs/
 reports/export/*.csv
 *.db-journal
 

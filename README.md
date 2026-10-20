@@ -2,7 +2,7 @@
 
 A standalone **Qt 6 Widgets** desktop application ("Iran Signal Tracker", SQLite-backed, mock
 telecom data) and a complete **Appium + WinAppDriver E2E automation stack** in front of it:
-a human-readable DSL, page objects, 15 pytest tests, and an Allure report.
+a human-readable DSL, page objects, 24 pytest tests, and a per-run Allure report.
 
 The app opens on a **sign-in gate** (register / login); the main window is tabbed (Home,
 Network Data, Dashboard, Reports, plus an admin-only Users tab). The E2E tests never touch
@@ -24,7 +24,7 @@ database/       fixtures/ (committed .db fixtures - the data source of truth), m
 automation/     pytest framework: config, locators, driver factory, DSL, page objects, tests/TC001-TC018
 docs/           test-cases/TC001-TC018.md, env-setup.md, superpowers/plans/
 scripts/        build / run / test / report PowerShell helpers (below)
-reports/        allure-results/ + allure-report/ (generated), export CSVs land in reports/export/
+reports/        runs/<timestamp>_<branch>_<commit>/ - one self-contained folder per test run (allure-results/ + allure-report/); export CSVs land in reports/export/
 ci/README.md    future CI/CD flow (documentation only)
 ```
 
@@ -69,7 +69,7 @@ $env:DRIVER_MODE = 'direct'    # fallback: talk to WinAppDriver on :4729 without
 # 5) the 15 E2E tests (TC001-TC015)
 powershell -ExecutionPolicy Bypass -File scripts\run-tests.ps1
 
-# 6) Allure report
+# 6) Allure report (newest run without one; -Run <name> for an older one)
 powershell -ExecutionPolicy Bypass -File scripts\run-allure.ps1 -Serve
 ```
 
@@ -84,8 +84,8 @@ cmake --build app\build-mingw
 C:\Qt\6.8.3\mingw_64\bin\windeployqt.exe --compiler-runtime app\build-mingw\IranSignalTracker.exe
 ctest --test-dir app\build-mingw
 WinAppDriver.exe          # direct mode; launch `appium --port 4723` for the Appium path
-cd automation; python -m pytest tests -v --alluredir=..\reports\allure-results
-allure generate ..\reports\allure-results -o ..\reports\allure-report --clean
+cd automation; python -m pytest tests -v --alluredir=..\reports\runs\myrun\allure-results
+allure generate ..\reports\runs\myrun\allure-results -o ..\reports\runs\myrun\allure-report
 ```
 
 ## What the app does

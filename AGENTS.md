@@ -21,8 +21,8 @@ pytest/Appium/WinAppDriver E2E stack. Two independent deliverables:
 powershell -ExecutionPolicy Bypass -File scripts\build.ps1      # configure+build+windeployqt
 powershell -ExecutionPolicy Bypass -File scripts\run-ctest.ps1  # app_smoke + app_dbtest
 powershell -ExecutionPolicy Bypass -File scripts\run-appium.ps1 # appium :4723 (keeps console open)
-powershell -ExecutionPolicy Bypass -File scripts\run-tests.ps1  # 15 E2E tests + allure-results
-powershell -ExecutionPolicy Bypass -File scripts\run-allure.ps1 # report (add -Serve to open)
+powershell -ExecutionPolicy Bypass -File scripts\run-tests.ps1  # 18 E2E + 6 unit -> reports\runs\<ts>_<branch>_<commit>\
+powershell -ExecutionPolicy Bypass -File scripts\run-allure.ps1 # report for newest run w/o one (add -Serve to open, -Run <name> for older)
 powershell -ExecutionPolicy Bypass -File scripts\run-app.ps1    # launch the exe
 ```
 
