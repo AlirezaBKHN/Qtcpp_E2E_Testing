@@ -60,12 +60,18 @@ jobs:
       - name: Wire IST_* tool paths
         shell: pwsh
         run: |
-          $gxx = (Get-ChildItem 'C:\Qt\Tools\mingw*\bin\g++.exe' |
-                  Select-Object -First 1).FullName
-          if (-not $gxx) { throw 'MinGW g++ not found under C:\Qt\Tools\mingw*' }
-          Add-Content $env:GITHUB_ENV "IST_QT_BIN=C:\Qt\6.8.3\mingw_64\bin"
-          Add-Content $env:GITHUB_ENV "IST_GCC=$(Join-Path (Split-Path $gxx -Parent) 'gcc.exe')"
-          Add-Content $env:GITHUB_ENV "IST_GXX=$gxx"
+          $gxx = Get-ChildItem "$env:IQTA_TOOLS\mingw*\bin\g++.exe" |
+                 Select-Object -First 1
+          if (-not $gxx) {
+            $gxx = Get-ChildItem 'C:\Qt*\Tools\mingw*\bin\g++.exe' |
+                   Select-Object -First 1
+          }
+          if (-not $gxx) {
+            throw 'MinGW g++ not found under IQTA_TOOLS / C:\Qt*\Tools'
+          }
+          Add-Content $env:GITHUB_ENV "IST_QT_BIN=$env:QT_ROOT_DIR\bin"
+          Add-Content $env:GITHUB_ENV "IST_GCC=$(Join-Path $gxx.DirectoryName 'gcc.exe')"
+          Add-Content $env:GITHUB_ENV "IST_GXX=$($gxx.FullName)"
           Add-Content $env:GITHUB_ENV "IST_CMAKE=$((Get-Command cmake.exe).Source)"
           Add-Content $env:GITHUB_ENV "IST_NINJA=$((Get-Command ninja.exe).Source)"
 
